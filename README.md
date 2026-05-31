@@ -33,9 +33,42 @@ goal is to verify the pipeline end-to-end before deploying to an H100 host.
 - `src/mdm_chipmunk/eval/` — task definitions, metrics, harness.
 - `configs/` — YAML configs for models, tasks, methods (one file each, named).
 - `scripts/` — entry-point shell scripts and smoke tests.
-- `chipmunk/` — reference clone of upstream Chipmunk (read-only, do not edit).
+- `chipmunk/`, `fastdllm/`, `dkv_cache/` — reference clones of the upstream
+  implementations. Gitignored; populated by `scripts/clone_baselines.sh`.
 
 ## Running on H100
 
-See `configs/host_h100.yaml` and the section at the end of this README once
-Phase E lands.
+The CPU pipeline only exercises shapes and the harness. Real speedup numbers
+require an H100 (or A100 fallback). On a fresh GPU host:
+
+```bash
+# 1. System prep
+git clone https://github.com/your-fork/chipmunk-on-masked-llm.git
+cd chipmunk-on-masked-llm
+bash scripts/clone_baselines.sh          # pulls chipmunk/, fastdllm/, dkv_cache/
+
+# 2. Python env
+python3.13 -m venv .venv && source .venv/bin/activate
+pip install -e '.[gpu,dev]'
+pip install -e ./chipmunk                # only if you'll run the kernel branch later
+
+# 3. Model weights
+bash scripts/download_llada.sh           # ~16 GB to ~/.cache/huggingface
+
+# 4. Baseline reproduction (Month 1 milestone gate)
+mdm-bench run --method dense       --model llada-8b-instruct --task gsm8k     --num-samples 100 --out results/llada_dense_gsm8k.jsonl
+mdm-bench run --method fastdllm    --model llada-8b-instruct --task gsm8k     --num-samples 100 --out results/llada_fastdllm_gsm8k.jsonl
+mdm-bench run --method dkv_cache   --model llada-8b-instruct --task gsm8k     --num-samples 100 --out results/llada_dkv_gsm8k.jsonl
+mdm-bench run --method dualdiffusion --model llada-8b-instruct --task gsm8k   --num-samples 100 --out results/llada_dd_gsm8k.jsonl
+
+# 5. Validate against published numbers (within ±5%)
+for f in results/llada_*_gsm8k.jsonl; do mdm-bench compare --results $f; done
+```
+
+Targets and tolerances live in `configs/reproduction_targets.yaml`. Host-specific
+overrides (HF cache dir, batch size, num_workers) live in `configs/hosts/*.yaml`.
+
+## Layout
+
+(see project root)
+

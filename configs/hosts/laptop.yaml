@@ -1,0 +1,10 @@
+name: laptop
+description: Apple Silicon laptop, CPU/MPS smoke tests only.
+device: cpu
+dtype: float32
+hf_cache_dir: ~/.cache/huggingface
+num_workers: 0
+default_batch_size: 1
+notes: |
+  CPU pipeline-validation only. Real benchmarks need a GPU host.
+  Set MDM_DEVICE=cpu in the shell to override the auto-MPS pick.

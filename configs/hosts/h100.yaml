@@ -1,0 +1,10 @@
+name: h100
+description: H100-SXM5 dev host (primary Hopper target, matches Chipmunk eval).
+device: cuda
+dtype: bfloat16
+hf_cache_dir: ~/.cache/huggingface
+num_workers: 8
+default_batch_size: 1
+notes: |
+  Use this host for the primary speedup numbers reported in the proposal.
+  Chipmunk kernels and ThunderKittens require sm_90+; will not run on A100.

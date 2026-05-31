@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
+import yaml
 from rich.console import Console
+from rich.table import Table
 
 from .eval.harness import run
 from .eval.tasks.registry import build_task, list_tasks
@@ -56,6 +59,66 @@ def list_cmd(kind: str = typer.Argument(..., help="One of: models, methods, task
         raise typer.BadParameter(f"kind must be one of {list(options)}")
     for name in options[kind]():
         console.print(f"- {name}")
+
+
+@app.command("compare")
+def compare_cmd(
+    results: Path = typer.Option(..., help="JSONL results file produced by `mdm-bench run`"),
+    targets: Path = typer.Option(
+        Path(__file__).resolve().parents[2] / "configs" / "reproduction_targets.yaml",
+        help="YAML of reproduction targets (default: bundled config)",
+    ),
+) -> None:
+    """Check whether reproduced numbers match published targets within tolerance."""
+    if not results.exists():
+        raise typer.BadParameter(f"Results file not found: {results}")
+    with open(targets) as f:
+        tgt_cfg = yaml.safe_load(f)
+    tolerance = float(tgt_cfg.get("tolerance", 0.05))
+
+    rows = [json.loads(line) for line in results.read_text().splitlines() if line.strip()]
+    if not rows:
+        console.print("[yellow]No rows in results file.[/yellow]")
+        return
+
+    method = rows[0]["method"]
+    model = rows[0]["model"]
+    task = rows[0]["task"]
+    correct = sum(1 for r in rows if r["correct"]) / len(rows)
+
+    match = None
+    for t in tgt_cfg.get("targets", []):
+        if t["method"] == method and t["model"] == model and t["task"] == task:
+            match = t
+            break
+
+    table = Table(title=f"Reproduction check — {method} × {model} × {task}")
+    table.add_column("Metric")
+    table.add_column("Observed")
+    table.add_column("Target")
+    table.add_column("Δ%")
+    table.add_column("Pass?")
+
+    if match is None:
+        console.print(
+            f"[yellow]No target row for {method!r}/{model!r}/{task!r} — only summary printed.[/yellow]"
+        )
+        table.add_row("accuracy", f"{correct:.3f}", "—", "—", "—")
+        console.print(table)
+        return
+
+    target_acc = match.get("accuracy")
+    if target_acc is not None:
+        delta = (correct - target_acc) / target_acc if target_acc else float("inf")
+        passed = abs(delta) <= tolerance
+        table.add_row(
+            "accuracy",
+            f"{correct:.3f}",
+            f"{target_acc:.3f}",
+            f"{delta * 100:+.1f}%",
+            "[green]PASS[/green]" if passed else "[red]FAIL[/red]",
+        )
+    console.print(table)
 
 
 if __name__ == "__main__":

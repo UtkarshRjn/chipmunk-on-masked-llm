@@ -1,0 +1,10 @@
+name: a100
+description: A100 80GB fallback host (matches FastDLLM upstream eval).
+device: cuda
+dtype: bfloat16
+hf_cache_dir: ~/.cache/huggingface
+num_workers: 8
+default_batch_size: 1
+notes: |
+  A100 has no cp.async/wgmma — Chipmunk falls back to Triton kernels.
+  Use this host for the A100-vs-H100 characterization plot (proposal §5).

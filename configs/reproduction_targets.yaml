@@ -1,0 +1,73 @@
+# Per-method × per-task reproduction targets from the upstream papers.
+# Month 1 milestone gate (proposal §7): every published number we reproduce must
+# land within ±tolerance of the target. CLI `mdm-bench compare` checks JSONL
+# results against this file.
+#
+# Numbers cited from:
+#   FastDLLM:      Wu et al. 2025 (arXiv:2505.22618), Tables 1-3
+#   dKV-Cache:     Ma et al. 2025 (arXiv:2505.15781), Tables 2-3
+#   DualDiffusion: Goyal et al. 2026 (arXiv:2604.05250), Table 1
+# Speedups are vs LLaDA dense baseline.
+
+tolerance: 0.05   # ±5% relative — proposal §7 says "within 5%"
+
+targets:
+  - method: dense
+    model: llada-8b-instruct
+    task: gsm8k
+    num_shots: 5
+    gen_length: 256
+    accuracy: 0.73        # LLaDA paper baseline
+    notes: dense ceiling — used to compute speedups for everything else
+
+  - method: dense
+    model: llada-8b-instruct
+    task: humaneval
+    gen_length: 256
+    accuracy: 0.336
+
+  - method: fastdllm
+    model: llada-8b-instruct
+    task: gsm8k
+    num_shots: 8
+    gen_length: 1024
+    accuracy: 0.760
+    speedup_vs_dense: 27.6
+    notes: headline number for Fast-dLLM (Wu et al. Table 1)
+
+  - method: fastdllm
+    model: llada-8b-instruct
+    task: humaneval
+    gen_length: 512
+    accuracy: 0.543
+    speedup_vs_dense: 3.2
+
+  - method: fastdllm
+    model: llada-8b-instruct
+    task: mbpp
+    gen_length: 512
+    speedup_vs_dense: 7.8
+
+  - method: dkv_cache
+    mode: decode
+    model: llada-8b-instruct
+    task: gsm8k
+    num_shots: 5
+    speedup_vs_dense: 5.0   # midpoint of "2-10×" range, Ma et al. Table 2
+    notes: dKV-Cache-Decode
+
+  - method: dualdiffusion
+    model: llada-8b-instruct
+    task: mmlu
+    num_shots: 5
+    speedup_vs_dense: 3.9
+    notes: Goyal et al. Table 1
+
+  - method: dualdiffusion
+    model: llada-8b-instruct
+    task: gsm8k
+    accuracy: 0.25
+    notes: |
+      Goyal et al. report DualDiffusion fails on GSM8K (0.25 vs 0.57 dense).
+      Reproducing this failure mode is part of motivating the kernel-level
+      contribution (proposal §2.2).
