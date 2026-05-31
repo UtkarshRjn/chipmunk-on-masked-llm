@@ -1,0 +1,4 @@
+name: dense
+method: dense
+temperature: 0.0
+remasking: low_confidence

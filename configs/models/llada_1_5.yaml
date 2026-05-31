@@ -1,0 +1,8 @@
+name: llada-1.5
+architecture: llada
+hf_id: GSAI-ML/LLaDA-1.5
+mask_token_id: 126336
+seq_len: 4096
+num_layers: 32
+vocab_size: 126464
+trust_remote_code: true

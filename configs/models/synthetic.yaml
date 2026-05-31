@@ -1,0 +1,8 @@
+name: synthetic
+architecture: synthetic-transformer
+hf_id: ""
+mask_token_id: 1
+seq_len: 32
+num_layers: 2
+vocab_size: 64
+trust_remote_code: false

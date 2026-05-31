@@ -1,0 +1,5 @@
+name: synthetic
+task: synthetic
+num_samples: 5
+seed: 0
+gen_length: 8

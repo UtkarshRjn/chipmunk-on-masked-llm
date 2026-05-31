@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mdm-chipmunk"
+version = "0.1.0"
+description = "Mask-Adaptive Sparse Kernels for Masked Diffusion Language Models"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Utkarsh Ranjan" }]
+license = { text = "Apache-2.0" }
+dependencies = [
+    "torch>=2.3",
+    "transformers>=4.44",
+    "accelerate>=0.33",
+    "datasets>=2.20",
+    "tokenizers>=0.19",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+    "rich>=13.7",
+    "numpy>=1.26",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+gpu = [
+    "flash-attn>=2.6; platform_system == 'Linux'",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-xdist>=3.5",
+    "ruff>=0.5",
+    "ipykernel>=6.29",
+]
+
+[project.scripts]
+mdm-bench = "mdm_chipmunk.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mdm_chipmunk = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::FutureWarning",
+]

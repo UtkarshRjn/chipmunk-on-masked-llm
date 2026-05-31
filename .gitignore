@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Project artifacts
+results/
+checkpoints/
+runs/
+wandb/
+*.log
+
+# Notebooks
+.ipynb_checkpoints/
+
+# HuggingFace / model weights — never commit
+*.safetensors
+*.bin
+*.pt
+*.pth
+hf_cache/
+~/.cache/huggingface/
+
+# Local config overrides
+configs/local/
+.env
+
+# Upstream Chipmunk reference clone — not part of this package
+chipmunk/

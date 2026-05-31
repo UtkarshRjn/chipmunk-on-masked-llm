@@ -1,0 +1,12 @@
+name: llada-8b-instruct
+architecture: llada
+hf_id: GSAI-ML/LLaDA-8B-Instruct
+mask_token_id: 126336
+seq_len: 4096
+num_layers: 32
+vocab_size: 126464
+trust_remote_code: true
+extras:
+  notes: |
+    Verify mask_token_id and vocab_size on first load against the HF tokenizer.
+    Per LLaDA model card example (Feb 2025), mask token == 126336.

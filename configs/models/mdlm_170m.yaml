@@ -1,0 +1,12 @@
+name: mdlm-170m
+architecture: mdlm
+hf_id: kuleshov-group/mdlm-owt
+mask_token_id: 50257
+seq_len: 1024
+num_layers: 12
+vocab_size: 50258
+trust_remote_code: true
+extras:
+  notes: |
+    Sahoo et al. 2024 MDLM trained on OpenWebText. Used as CPU smoke-test target.
+    Verify mask_token_id against the actual tokenizer on first load.

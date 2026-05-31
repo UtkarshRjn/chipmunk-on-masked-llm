@@ -1,0 +1,7 @@
+name: gsm8k
+task: gsm8k
+num_shots: 5
+gen_length: 256
+split: test
+hf_id: openai/gsm8k
+subset: main
