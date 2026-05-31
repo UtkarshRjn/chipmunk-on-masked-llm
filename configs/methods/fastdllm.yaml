@@ -1,0 +1,7 @@
+name: fastdllm
+method: fastdllm
+mode: dual_cache         # vanilla | prefix_cache | dual_cache
+block_length: 32
+temperature: 0.0
+remasking: low_confidence
+threshold: 0.9           # confidence-aware parallel decoding threshold

@@ -44,5 +44,7 @@ hf_cache/
 configs/local/
 .env
 
-# Upstream Chipmunk reference clone — not part of this package
+# Upstream reference clones — not part of this package
 chipmunk/
+fastdllm/
+dkv_cache/

@@ -1,0 +1,7 @@
+name: fastdllm_vanilla
+method: fastdllm
+mode: vanilla            # no KV cache — runs on any MDMModel including synthetic
+block_length: 32
+temperature: 0.0
+remasking: low_confidence
+threshold: 0.9
