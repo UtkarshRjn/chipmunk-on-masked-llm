@@ -1,0 +1,13 @@
+name: dualdiffusion
+method: dualdiffusion
+drafter_method_name: fastdllm_vanilla
+drafter_method_cfg:
+  mode: vanilla
+  block_length: 32
+  threshold: 0.5
+draft_steps: 4
+verify_rule: confidence    # confidence | kl | both
+confidence_threshold: 0.7
+kl_threshold: 0.5
+temperature: 0.0
+max_outer_loops: 16

@@ -1,0 +1,7 @@
+name: dkv_cache
+method: dkv_cache
+mode: decode             # no_cache | decode | greedy
+block_length: 32
+cache_reloading_step: 4
+temperature: 0.0
+remasking: low_confidence

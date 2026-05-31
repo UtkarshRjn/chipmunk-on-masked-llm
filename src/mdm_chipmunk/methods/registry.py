@@ -45,6 +45,8 @@ def build_method(name: str, **overrides: Any) -> InferenceMethod:
     if kind == "dualdiffusion":
         from .dualdiffusion import DualDiffusion
 
+        if "drafter_method_cfg" in cfg and cfg["drafter_method_cfg"] is None:
+            cfg["drafter_method_cfg"] = {}
         return DualDiffusion(**cfg)
 
     raise ValueError(f"Unknown method {kind!r} in config {name!r}")

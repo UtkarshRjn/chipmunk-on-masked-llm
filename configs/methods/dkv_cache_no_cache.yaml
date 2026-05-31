@@ -1,0 +1,7 @@
+name: dkv_cache_no_cache
+method: dkv_cache
+mode: no_cache           # algorithmic schedule only — runs on any MDMModel
+block_length: 32
+cache_reloading_step: 4
+temperature: 0.0
+remasking: low_confidence
