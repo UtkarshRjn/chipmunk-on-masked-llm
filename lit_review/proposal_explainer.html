@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Research Proposal Explainer — Mask-Adaptive Sparse Kernels for MDMs</title>
+<style>
+  :root {
+    --bg: #0f1117; --bg2: #181c27; --bg3: #1e2333; --border: #2a3050;
+    --text: #e2e8f0; --muted: #8892aa;
+    --green: #4ade80; --orange: #fb923c; --blue: #60a5fa;
+    --purple: #a78bfa; --yellow: #facc15; --red: #f87171; --pink: #f472b6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.7; font-size: 16px; }
+
+  .hero { background: linear-gradient(135deg, #0f1117 0%, #0d1f1a 40%, #1a0f2e 80%, #0f1117 100%); border-bottom: 1px solid var(--border); padding: 60px 40px 50px; text-align: center; }
+  .hero h1 { font-size: 2.2rem; font-weight: 800; background: linear-gradient(90deg, #4ade80, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 10px; line-height: 1.25; }
+  .hero .sub { color: var(--muted); font-size: 0.98rem; max-width: 720px; margin: 12px auto 20px; }
+  .pill-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .pill { background: var(--bg3); border: 1px solid var(--border); border-radius: 999px; padding: 4px 14px; font-size: 0.82rem; color: var(--muted); }
+  .pill.g { border-color: var(--green); color: var(--green); }
+  .pill.b { border-color: var(--blue); color: var(--blue); }
+  .pill.p { border-color: var(--purple); color: var(--purple); }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  section { padding: 60px 0; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; color: #f1f5f9; }
+  h3 { font-size: 1.05rem; font-weight: 600; margin: 24px 0 10px; color: var(--blue); }
+  p { color: #cbd5e1; margin-bottom: 12px; }
+  .sl { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--purple); margin-bottom: 6px; }
+
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin: 18px 0; }
+  .card.ga { border-left: 3px solid var(--green); }
+  .card.oa { border-left: 3px solid var(--orange); }
+  .card.ba { border-left: 3px solid var(--blue); }
+  .card.pa { border-left: 3px solid var(--purple); }
+  .card.ya { border-left: 3px solid var(--yellow); }
+  .card.ra { border-left: 3px solid var(--red); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 0; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 18px 0; }
+  @media (max-width: 640px) { .two-col, .three-col { grid-template-columns: 1fr; } }
+
+  .callout { background: #172032; border: 1px solid #2563eb44; border-left: 3px solid var(--blue); border-radius: 8px; padding: 14px 18px; margin: 16px 0; font-size: 0.92rem; color: #93c5fd; }
+  .callout.o { background: #1f1508; border-color: #f9731644; border-left-color: var(--orange); color: #fdba74; }
+  .callout.g { background: #0a1f14; border-color: #22c55e44; border-left-color: var(--green); color: #86efac; }
+  .callout.y { background: #1f1a08; border-color: #facc1544; border-left-color: var(--yellow); color: #fde68a; }
+  .callout.p { background: #150a2e; border-color: #a78bfa44; border-left-color: var(--purple); color: #c4b5fd; }
+  .callout.r { background: #1f0a0a; border-color: #f8717144; border-left-color: var(--red); color: #fca5a5; }
+
+  pre { background: #0d1117; border: 1px solid var(--border); border-radius: 10px; padding: 18px; font-size: 0.8rem; overflow-x: auto; color: #e2e8f0; line-height: 1.6; margin: 14px 0; }
+  .kw { color: #a78bfa; } .fn { color: #60a5fa; } .cm { color: #6b7280; } .num { color: #fb923c; } .st { color: #4ade80; }
+
+  .eq { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; font-family: 'Courier New', monospace; font-size: 0.85rem; color: var(--yellow); margin: 10px 0; overflow-x: auto; white-space: pre; line-height: 1.6; }
+
+  .stat-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 18px 0; }
+  .stat { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; text-align: center; min-width: 120px; }
+  .stat .nb { font-size: 1.9rem; font-weight: 800; display: block; line-height: 1; margin-bottom: 4px; }
+  .stat .lb { font-size: 0.76rem; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 0.85rem; }
+  th { background: var(--bg3); border: 1px solid var(--border); padding: 10px 12px; text-align: left; color: var(--muted); font-weight: 600; }
+  td { border: 1px solid var(--border); padding: 10px 12px; color: var(--text); }
+  tr:nth-child(even) td { background: var(--bg2); }
+  .tg { color: var(--green); font-weight: 700; }
+  .ty { color: var(--yellow); }
+  .tr { color: var(--red); }
+  .tb { color: var(--blue); }
+
+  .toc { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin: 28px 0 0; }
+  .toc h4 { color: var(--muted); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+  .toc a { display: block; color: #94a3b8; text-decoration: none; padding: 3px 0; font-size: 0.87rem; }
+  .toc a:hover { color: var(--green); }
+  .toc a::before { content: '→  '; color: var(--border); }
+
+  .contrib-num { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 0.8rem; font-weight: 800; margin-right: 10px; flex-shrink: 0; }
+
+  .layer-row { display: flex; gap: 0; margin: 20px 0; }
+  .layer { flex: 1; padding: 16px; text-align: center; border: 1px solid var(--border); }
+  .layer:first-child { border-radius: 10px 0 0 10px; }
+  .layer:last-child { border-radius: 0 10px 10px 0; }
+  .layer .lnum { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+  .layer .ltitle { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+  .layer .ldesc { font-size: 0.75rem; color: var(--muted); }
+
+  .month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0; }
+  @media (max-width: 640px) { .month-grid { grid-template-columns: 1fr; } }
+  .month { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .month .mnum { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .month .mtitle { font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; }
+  .month .mdesc { font-size: 0.78rem; color: #94a3b8; }
+  .month .mgoal { font-size: 0.75rem; color: var(--green); margin-top: 6px; }
+
+  .pitch-box { background: linear-gradient(135deg, #0a1f14, #150a2e); border: 1px solid var(--green); border-radius: 12px; padding: 24px 28px; margin: 20px 0; }
+  .pitch-box p { color: #c4b5fd; font-size: 0.95rem; line-height: 1.8; margin: 0; }
+
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 18px 0; }
+  @media (max-width: 640px) { .compare-grid { grid-template-columns: 1fr; } }
+  .cg-header { padding: 10px 14px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .cg-body { padding: 14px 14px; font-size: 0.82rem; color: #cbd5e1; border-top: 1px solid var(--border); }
+  .cg-col { border-right: 1px solid var(--border); }
+  .cg-col:last-child { border-right: none; }
+
+  .gap-arrow { text-align: center; font-size: 2rem; color: var(--border); padding: 8px 0; }
+
+  .q-row { margin: 14px 0; }
+  .q-num { font-size: 0.75rem; font-weight: 700; color: var(--purple); letter-spacing: 0.05em; }
+  .q-text { color: #cbd5e1; font-size: 0.9rem; margin: 4px 0 0; }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="container">
+    <h1>Mask-Adaptive Sparse Kernels<br>for Masked Diffusion Language Models</h1>
+    <p class="sub">Training-free Hopper-native acceleration via Chipmunk-style gather-pack kernels, magnitude-based K/V delta selection, and composition with FastDLLM and DualDiffusion</p>
+    <div class="pill-row">
+      <span class="pill">Author: Utkarsh Ranjan</span>
+      <span class="pill">Target: Dan Y. Fu — UCSD</span>
+      <span class="pill g">MLSys / ICLR / NeurIPS</span>
+      <span class="pill b">Draft v2 — May 2026</span>
+      <span class="pill p">Primary model: LLaDA-8B-Instruct</span>
+    </div>
+    <div class="toc">
+      <h4>Contents — read in order</h4>
+      <a href="#problem">01 — The Problem: Why MDMs are 10–30× slower than AR LMs</a>
+      <a href="#landscape">02 — Prior Work: What exists and where it stops</a>
+      <a href="#gap">03 — The Gap: Why kernel-level work is still unclaimed</a>
+      <a href="#contributions">04 — Five Contributions: What this proposal actually builds</a>
+      <a href="#algorithm">05 — End-to-End Algorithm: How it all fits together</a>
+      <a href="#theory">06 — Theoretical Analysis: The formal error bound</a>
+      <a href="#experiments">07 — Experiments: Benchmarks, targets, ablations</a>
+      <a href="#timeline">08 — Timeline: 6 months to a paper</a>
+      <a href="#why">09 — Why Dan Fu's Group?</a>
+      <a href="#openqs">10 — Open Questions for the Advisor Meeting</a>
+    </div>
+  </div>
+</div>
+
+
+<!-- 01 PROBLEM -->
+<section id="problem">
+<div class="container">
+  <div class="sl">01 — The Problem</div>
+  <h2>Why MDMs are 10–30× slower than AR LMs</h2>
+
+  <p>Masked Diffusion Language Models (LLaDA-8B, Dream-7B, Mercury) generate text through a denoising process — starting with all tokens as <code>[MASK]</code> and progressively unmasking them over T steps. This is fundamentally different from autoregressive generation, and the difference is brutal for performance.</p>
+
+  <h3>The inference loop</h3>
+  <pre><span class="cm"># MDM inference (LLaDA-8B, L=1024 tokens, T=128 steps)</span>
+x_1 = [MASK, MASK, ..., MASK]      <span class="cm"># all L positions masked</span>
+
+<span class="kw">for</span> t <span class="kw">in</span> range(T, 0, -1):
+    logits = model(x_t)             <span class="cm"># full forward pass: BIDIRECTIONAL attention</span>
+    x_{t-1} = unmask_confident(x_t, logits)
+
+<span class="kw">return</span> x_0                          <span class="cm"># final answer</span>
+
+<span class="cm"># Total work: T × O(L²) = 128 × O(1024²) = 128 × 1M ops = 134M</span>
+<span class="cm"># AR with KV cache: O(L²) total. MDMs: O(T·L²) = 128× more.</span></pre>
+
+  <div class="two-col">
+    <div class="card ra">
+      <h3 style="margin-top:0;color:var(--red)">MDMs — no KV cache possible</h3>
+      <p style="font-size:0.85rem;"><strong>Bidirectional attention:</strong> every token attends to every other token. When ANY token unmasks, K and V for ALL tokens can shift.</p>
+      <p style="font-size:0.85rem;"><strong>Non-sequential order:</strong> any position can be chosen to unmask based on confidence. You can't pre-allocate next positions.</p>
+      <p style="font-size:0.85rem;margin-bottom:0;"><strong>Result:</strong> O(L²) full recompute every step. 128 steps = 128× the work of AR generation for same-length output.</p>
+    </div>
+    <div class="card ga">
+      <h3 style="margin-top:0;color:var(--green)">AR LMs — KV cache works perfectly</h3>
+      <p style="font-size:0.85rem;"><strong>Causal attention:</strong> token i only attends to tokens 1..i. Once generated, K[i] and V[i] never change.</p>
+      <p style="font-size:0.85rem;"><strong>Sequential L→R order:</strong> next position always known in advance.</p>
+      <p style="font-size:0.85rem;margin-bottom:0;"><strong>Result:</strong> O(L) per new token with KV cache. O(L²) total. 128× cheaper than MDM for same-length output at comparable model size.</p>
+    </div>
+  </div>
+
+  <h3>The empirical escape hatch</h3>
+  <p>If every K,V changed drastically at every step, there would be no hope. But dKV-Cache (Ma et al. 2025) measured something important:</p>
+  <div class="callout g">
+    <strong>Observation (dKV-Cache Figure 2):</strong> Once a token decodes (unmasks), its K,V representation stabilizes in subsequent steps. Masked tokens fluctuate. Decoded tokens: stable. This is the empirical foundation everything builds on.
+  </div>
+  <p>This means across steps, only a <strong>small active set</strong> of positions has K,V that actually changed significantly. The rest can be cached. The question is: <em>which positions</em> are in the active set, and <em>how do you compute attention on them efficiently</em>?</p>
+
+  <div class="stat-row">
+    <div class="stat"><span class="nb" style="color:var(--red)">O(T·L²)</span><span class="lb">MDM total without<br>any cache</span></div>
+    <div class="stat"><span class="nb" style="color:var(--green)">O(L²)</span><span class="lb">AR LM total<br>with KV cache</span></div>
+    <div class="stat"><span class="nb" style="color:var(--yellow)">5–25%</span><span class="lb">active set fraction<br>(Chipmunk baseline)</span></div>
+    <div class="stat"><span class="nb" style="color:var(--blue)">128</span><span class="lb">denoising steps<br>for LLaDA-8B</span></div>
+  </div>
+</div>
+</section>
+
+
+<!-- 02 LANDSCAPE -->
+<section id="landscape">
+<div class="container">
+  <div class="sl">02 — Prior Work Landscape</div>
+  <h2>What exists — and where it stops</h2>
+
+  <p>Two recent papers approximate the missing cache. Both are algorithmic-only, both run on older hardware, both explicitly invite further work.</p>
+
+  <h3>FastDLLM (Wu et al. 2025 — NVIDIA, HKU, MIT)</h3>
+  <div class="card ba">
+    <p style="font-size:0.85rem;"><strong>Two-trick approach:</strong></p>
+    <p style="font-size:0.85rem;"><strong>Trick 1 — Block-wise KV Cache:</strong> split response into blocks of B=32 tokens. Cache K,V for the prompt (PrefixCache) and optionally for the suffix [MASK] blocks (DualCache). Within a block's T decoding steps, only recompute the active block's K,V. Cache refreshes after each full block completes.</p>
+    <p style="font-size:0.85rem;"><strong>Trick 2 — Confidence-aware parallel decoding:</strong> unmask multiple tokens per step if their softmax confidence > τ=0.9. Theorem 1: if (n+1)ε ≤ 1, parallel greedy = sequential greedy. Averages 3.25 tokens/step, cutting steps from 1024 to ~315.</p>
+    <div class="eq">Results on A100:
+  GSM8K (8-shot, gen=1024, DualCache):  27.6×  ← memory-bound, long context
+  HumanEval (0-shot, gen=1024):          3.7×  ← compute-bound, short response
+  GSM8K (5-shot, gen=256):               8.1×</div>
+    <p style="font-size:0.85rem;color:var(--muted);">The 27.6× is real but comes from a regime where memory bandwidth is the bottleneck (long prompt, long response). Code generation is compute-bound — the kernel has to actually do the FLOPs, and block-level caching doesn't help with FLOPs.</p>
+  </div>
+
+  <h3>dKV-Cache (Ma et al. 2025 — NUS)</h3>
+  <div class="card pa">
+    <p style="font-size:0.85rem;"><strong>One-step delayed caching:</strong> when a token decodes (unmasks), don't cache its K,V immediately — wait one step. Why? The decode step is the step with maximum K,V change. Waiting one step lets the representation settle. Cache decoded tokens' K,V with periodic refresh every N=4–8 steps.</p>
+    <p style="font-size:0.85rem;"><strong>concat_reorder:</strong> at the start of each step, reorder the token sequence so decoded (cached) tokens are on the left and masked (recomputed) tokens are on the right. This makes K,V concatenation contiguous — no scatter gather needed.</p>
+    <div class="eq">Results on A6000 / H20:
+  MMLU:                  1.97×  (near-lossless)
+  GSM8K:                 2.00×  (accuracy improved: 72% → 77%!)
+  HumanEval:             2.00×  (accuracy improved: 19% → 39%!)
+  GPQA (long prefill):  10–18×  (prefix cache dominates)</div>
+    <p style="font-size:0.85rem;color:var(--muted);">The accuracy improvements (not just maintaining quality, but exceeding baseline!) suggest that full bidirectional attention every step may actually create noise that harms predictions. Caching decoded tokens provides a stable anchor.</p>
+  </div>
+
+  <h3>The full landscape</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Approach</th><th>Hardware</th><th>Kernel work?</th><th>Speedup</th></tr></thead>
+    <tbody>
+      <tr><td><strong>FastDLLM</strong></td><td>Block-wise cache + parallel decode</td><td class="ty">A100</td><td class="tr">No (PyTorch)</td><td class="tg">Up to 27.6×</td></tr>
+      <tr><td><strong>dKV-Cache-Decode</strong></td><td>Delayed caching by recency</td><td class="ty">A6000, H20</td><td class="tr">No (PyTorch)</td><td class="tg">2–10×</td></tr>
+      <tr><td><strong>dKV-Cache-Greedy</strong></td><td>Fixed-size active set, O(L²)</td><td class="ty">A6000, H20</td><td class="tr">No (PyTorch)</td><td class="ty">~1.7× (quality↓)</td></tr>
+      <tr><td><strong>DualDiffusion</strong></td><td>Speculative decoding (FastDLLM drafter)</td><td class="ty">Unspecified</td><td class="tr">No</td><td class="tr">Fails GSM8K</td></tr>
+      <tr><td><strong>Eso-LMs</strong></td><td>Causal attention + hybrid training</td><td class="ty">Academic scale</td><td class="tr">Arch change</td><td class="ty">14–65× (vs MDMs)</td></tr>
+      <tr><td><strong>This proposal</strong></td><td>Chipmunk kernels + magnitude selection</td><td class="tg">H100-SXM5</td><td class="tg">Yes (ThunderKittens)</td><td class="tg">1.3–2× over FastDLLM</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+
+<!-- 03 GAP -->
+<section id="gap">
+<div class="container">
+  <div class="sl">03 — The Gap</div>
+  <h2>Why kernel-level work is completely unclaimed</h2>
+
+  <div class="pitch-box">
+    <p>Every prior MDM acceleration method runs PyTorch operators on A100 or older hardware. The Hopper GPU (H100) has a completely new feature surface — <code>cp.async</code> for scattered HBM loads, TMA (Tensor Memory Accelerator) for contiguous loads, <code>wgmma</code> warp-group matrix multiply, and warp specialization for producer/consumer overlap. None of these have been characterized for MDM workloads. And Chipmunk — the paper that built exactly this kernel toolkit for image diffusion — explicitly does not mention MDMs as an application.</p>
+  </div>
+
+  <div class="compare-grid">
+    <div class="cg-col">
+      <div class="cg-header" style="background:#1e1e2e;color:var(--blue);">dKV-Cache (has the algorithm)</div>
+      <div class="cg-body">
+        <p style="font-size:0.83rem;margin-bottom:8px;">✓ Correct caching strategy (one-step delay)<br>✓ concat_reorder for contiguous access<br>✓ Works on A6000 / H20</p>
+        <p style="font-size:0.83rem;margin-bottom:0;">✗ PyTorch-level ops only<br>✗ No cp.async scattered gather<br>✗ No wgmma tensor cores<br>✗ Recency heuristic, not magnitude<br>✗ No formal error bound</p>
+      </div>
+    </div>
+    <div class="cg-col">
+      <div class="cg-header" style="background:#1a0f2e;color:var(--purple);">Chipmunk (has the kernel)</div>
+      <div class="cg-body">
+        <p style="font-size:0.83rem;margin-bottom:8px;">✓ cp.async scattered gather from HBM<br>✓ SRAM packing + dense wgmma<br>✓ Magnitude top-k active selection<br>✓ Voxel reordering<br>✓ H100-SXM5 benchmarked</p>
+        <p style="font-size:0.83rem;margin-bottom:0;">✗ Built for image/video DiTs<br>✗ Output deltas, not K/V deltas<br>✗ Doesn't handle bidirectional cascade<br>✗ No MDM application mentioned</p>
+      </div>
+    </div>
+    <div class="cg-col">
+      <div class="cg-header" style="background:#0a1f14;color:var(--green);">This proposal (the missing piece)</div>
+      <div class="cg-body">
+        <p style="font-size:0.83rem;margin-bottom:8px;">✓ Port Chipmunk's kernel to MDMs<br>✓ Magnitude-based K/V active selection<br>✓ Two-partition softmax (active + cached)<br>✓ Formal error bound (first in MDM lit)<br>✓ H100-SXM5 native</p>
+        <p style="font-size:0.83rem;margin-bottom:0;">= dKV-Cache algorithm + Chipmunk kernel<br>+ magnitude selection + ThunderKittens<br>+ composition with FastDLLM/DualDiffusion</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>The invitation — dKV-Cache §5 verbatim</h3>
+  <div class="callout o" style="font-style:italic;">
+    "One primary limitation of this work lies in its focus on algorithmic design in isolation. While our proposed method introduces an effective caching mechanism from a purely algorithmic perspective, diffusion language models also exhibit substantial room for improvement at the system level. We believe that future research integrating algorithmic innovations with system-level optimization, such as memory management, parallelism, and hardware-aware execution, could unlock further efficiency gains and performance improvements for DLMs."
+  </div>
+  <p>They wrote the gap statement. This proposal fills it.</p>
+</div>
+</section>
+
+
+<!-- 04 CONTRIBUTIONS -->
+<section id="contributions">
+<div class="container">
+  <div class="sl">04 — Five Contributions</div>
+  <h2>What this proposal actually builds</h2>
+
+  <!-- C1 -->
+  <div class="card ba" style="margin-top:24px;">
+    <div style="display:flex;align-items:center;margin-bottom:12px;">
+      <span class="contrib-num" style="background:#1e3a5f;color:var(--blue);">1</span>
+      <h3 style="margin:0;color:var(--blue);">Hopper kernel for mask-adaptive attention</h3>
+    </div>
+    <p style="font-size:0.85rem;">The core engineering contribution. A custom CUDA kernel that splits K,V into two partitions every step:</p>
+    <div class="two-col">
+      <div>
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:6px;font-weight:700;">ACTIVE PARTITION (small, ~25–40% of tokens)</p>
+        <p style="font-size:0.82rem;">Still-masked tokens + recently changed tokens. Gathered from scattered HBM positions via <code>cp.async</code>, packed contiguously into SRAM. Dense <code>wgmma</code> GEMM on the packed tile — tensor cores never know it was sparse.</p>
+      </div>
+      <div>
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:6px;font-weight:700;">CACHED PARTITION (large, ~60–75% of tokens)</p>
+        <p style="font-size:0.82rem;">Stable decoded tokens whose K,V hasn't changed. Stays in HBM in column-major chunks of 192 tokens. Loaded via TMA (Tensor Memory Accelerator) for fast contiguous reads.</p>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;">Attention is computed across BOTH partitions via a two-pass online softmax — same technique as FlashAttention-3, but across two separate K,V sources instead of one.</p>
+    <pre><span class="cm">// Pseudo-kernel structure</span>
+<span class="cm">// Stage 1+2 — Pack active Q and K,V in parallel (warp specialization)</span>
+<span class="kw">for</span> k <span class="kw">in</span> 0..num_active:
+    <span class="fn">cp.async</span>(Q_smem[k], Q_hbm + q_active_idx[k] * row_stride)
+    <span class="fn">cp.async</span>(K_smem[k], K_hbm + kv_active_idx[k] * row_stride)
+
+<span class="cm">// Stage 3 — Two-pass online softmax across both partitions</span>
+attn_active = <span class="fn">wgmma</span>(Q_smem, K_smem, V_smem)           <span class="cm">// active: SRAM</span>
+attn_cached = <span class="fn">wgmma_with_tma</span>(Q_smem, K_cache, V_cache)  <span class="cm">// cached: HBM via TMA</span>
+output = <span class="fn">combine_softmax</span>(attn_active, attn_cached)
+
+<span class="cm">// Stage 4 — Async writeback to HBM</span>
+<span class="fn">cp.async.bulk_store</span>(out_hbm + q_active_idx, output)</pre>
+    <div class="callout" style="margin-top:8px;">Target: 60–75% of FlashAttention-3 dense throughput at 70% active-set sparsity → ~2–3× per-step speedup vs full dense recompute. Implemented in ThunderKittens DSL.</div>
+  </div>
+
+  <!-- C2 -->
+  <div class="card ga" style="margin-top:18px;">
+    <div style="display:flex;align-items:center;margin-bottom:12px;">
+      <span class="contrib-num" style="background:#0a1f14;color:var(--green);">2</span>
+      <h3 style="margin:0;color:var(--green);">Magnitude-based active subset selection</h3>
+    </div>
+    <p style="font-size:0.85rem;">dKV-Cache uses <strong>recency</strong> as the signal: once a token decodes, wait one step, then cache. This is correct but weak — it doesn't capture positions whose K,V is still shifting despite being long-decoded.</p>
+    <p style="font-size:0.85rem;">This proposal uses a <strong>hybrid magnitude + recency</strong> signal (same philosophy as Chipmunk's top-k by column-sum magnitude for image DiTs):</p>
+    <div class="eq">Active set A_t = A_recent  ∪  A_magnitude
+
+A_recent    = still-masked positions  ∪  decoded in last R=2 steps
+             (worst-case safety: newly unmasked must be recomputed)
+
+A_magnitude = top-k by  ||K_t^pred − K_{t-1}||  (cheap proxy)
+             (captures old tokens whose representation is still drifting)
+
+|A_t| ≈ 25–40% of L   (target sparsity)</div>
+    <div class="callout g">dKV-Cache Figure 2(c) showed that the largest K,V changes happen at the decode step — they observed the magnitude signal but used it only as motivation. Chipmunk used magnitude for output deltas in images. Nobody has used it for K,V deltas in MDMs. This is a genuine novel contribution.</div>
+    <p style="font-size:0.85rem;"><strong>Cheap proxy for magnitude:</strong> compute norm of a single-layer feature or early-exit from layer 4 of the 32-layer model. Amortize cost across multiple steps. Chipmunk's approximate top-k gives 3.42× speedup over PyTorch top-k for the selection itself.</p>
+  </div>
+
+  <!-- C3 -->
+  <div class="card ya" style="margin-top:18px;">
+    <div style="display:flex;align-items:center;margin-bottom:12px;">
+      <span class="contrib-num" style="background:#1f1a08;color:var(--yellow);">3</span>
+      <h3 style="margin:0;color:var(--yellow);">Periodic dense re-anchor with formal error bound</h3>
+    </div>
+    <p style="font-size:0.85rem;">Using a sparse active set introduces approximation error — if a position should be in the active set but isn't, its K,V update is skipped, causing downstream attention to use a stale value. This error accumulates across steps.</p>
+    <p style="font-size:0.85rem;"><strong>The fix (same as Chipmunk's "dense anchor"):</strong> every M=7 denoising steps, run a full O(L²) dense bidirectional attention. This resets all accumulated error to zero and refreshes the cache with exact K,V values.</p>
+    <div class="eq">Per-step error:   err_step ≤ C₁·τ  +  κ_softmax·ε_numeric
+Accumulated error (M sparse steps):
+  err_M ≤ M · err_step · G_bidirectional^step
+  where G = cascade amplification factor (bidirectional feedback)
+
+After re-anchor step:  err = 0  (exact reset)</div>
+    <div class="callout y">The <strong>G_bidirectional</strong> term is the hard part. In image diffusion, errors are visually imperceptible and bounded trivially. In text, an error at position i shifts attention output at j, which feeds back at the next step. The formal proof bounds G using attention sharpness (max attention weight < α &lt; 1 → cascade is contractive → geometric convergence). This is the first formal error bound in the MDM acceleration literature.</div>
+    <p style="font-size:0.85rem;"><strong>Anchor period sweep:</strong> M ∈ {3, 5, 7, 10, 15, 20}. Chipmunk uses M=10 for images; expected MDM sweet spot M=5–10 based on dKV-Cache's refresh rate of 4–8.</p>
+  </div>
+
+  <!-- C4 -->
+  <div class="card oa" style="margin-top:18px;">
+    <div style="display:flex;align-items:center;margin-bottom:12px;">
+      <span class="contrib-num" style="background:#3a1a00;color:var(--orange);">4</span>
+      <h3 style="margin:0;color:var(--orange);">Hopper-native characterization (nobody has done this)</h3>
+    </div>
+    <p style="font-size:0.85rem;">Neither FastDLLM nor dKV-Cache tested on H100. The Hopper GPU (H100-SXM5) has specific features that significantly change performance characteristics:</p>
+    <div class="two-col">
+      <div>
+        <p style="font-size:0.82rem;color:var(--muted);font-weight:700;margin-bottom:6px;">Hopper features this proposal uses:</p>
+        <ul style="font-size:0.82rem;color:#cbd5e1;padding-left:18px;">
+          <li><code>cp.async</code> — scattered HBM loads, multiple in-flight</li>
+          <li>TMA — Tensor Memory Accelerator for contiguous chunks</li>
+          <li><code>wgmma</code> — warp-group matrix multiply (4th-gen tensor cores)</li>
+          <li>Warp specialization — producer/consumer overlap</li>
+          <li>Async barrier for softmax reduction across warps</li>
+        </ul>
+      </div>
+      <div>
+        <p style="font-size:0.82rem;color:var(--muted);font-weight:700;margin-bottom:6px;">Why this matters:</p>
+        <p style="font-size:0.82rem;"><code>cp.async</code> is what makes scattered gather cheap. On A100 you'd have to serialize the loads or use slower memory ops. On H100, you issue all K scattered loads simultaneously, they arrive in parallel, you pack them — all overlapped with the TMA load of the cached partition.</p>
+        <p style="font-size:0.82rem;margin-bottom:0;">Even just running FastDLLM and dKV-Cache on H100 (which nobody has done) is a useful contribution that characterizes the opportunity.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- C5 -->
+  <div class="card pa" style="margin-top:18px;">
+    <div style="display:flex;align-items:center;margin-bottom:12px;">
+      <span class="contrib-num" style="background:#150a2e;color:var(--purple);">5</span>
+      <h3 style="margin:0;color:var(--purple);">Three-layer stacked acceleration</h3>
+    </div>
+    <p style="font-size:0.85rem;">The three orthogonal speedup levers compose multiplicatively:</p>
+    <div class="layer-row">
+      <div class="layer" style="background:#1e3a5f22;">
+        <div class="lnum" style="color:var(--blue);">Layer 1 — Block level</div>
+        <div class="ltitle" style="color:var(--blue);">FastDLLM</div>
+        <div class="ldesc">Block-wise KV cache (PrefixCache + DualCache) + confidence-aware parallel decoding. Coarse caching. High-impact in memory-bound regime.</div>
+      </div>
+      <div class="layer" style="background:#0a1f1422;">
+        <div class="lnum" style="color:var(--green);">Layer 2 — Position level</div>
+        <div class="ltitle" style="color:var(--green);">This Proposal</div>
+        <div class="ldesc">Within each FastDLLM block, only recompute the active subset's K,V via cp.async gather + wgmma. Reduces actual FLOPs, not just memory I/O.</div>
+      </div>
+      <div class="layer" style="background:#1a0f2e22;">
+        <div class="lnum" style="color:var(--purple);">Layer 3 — Step level</div>
+        <div class="ltitle" style="color:var(--purple);">DualDiffusion-style</div>
+        <div class="ldesc">Speculative decoding with a small drafter + large verifier. Layer 2 makes the verifier ~2× faster. DualDiffusion currently fails on GSM8K — the error bound from C3 may fix this.</div>
+      </div>
+    </div>
+    <div class="callout p" style="margin-top:12px;">The composability story is strategically important: it sidesteps "do we beat FastDLLM" entirely. This proposal <em>includes</em> FastDLLM as a component. The question becomes "how much does the kernel-level work add on top" — which is a cleaner, more defensible comparison.</div>
+  </div>
+</div>
+</section>
+
+
+<!-- 05 ALGORITHM -->
+<section id="algorithm">
+<div class="container">
+  <div class="sl">05 — End-to-End Algorithm</div>
+  <h2>How it all fits together per denoising step</h2>
+
+  <div class="card">
+    <div class="eq">EACH DENOISING STEP t:
+
+Is this a re-anchor step? (t % M == 0)
+  YES → Full O(L²) dense attention.
+         Recompute all K,V. Refresh entire cache. Update drift proxy.
+         Cost: expensive but resets error to 0.
+
+  NO  → Sparse step.
+
+  1. Determine active set:
+       A_recent    = still-masked ∪ decoded in last 2 steps
+       A_magnitude = top-k drifters by proxy magnitude
+       A_t         = A_recent ∪ A_magnitude   (~25–40% of L)
+
+  2. Attention kernel (two-partition):
+       Gather A_t's K,V from HBM → SRAM (cp.async, parallel loads)
+       Load cached partition K,V from HBM via TMA (contiguous chunks)
+       Compute attention via two-pass online softmax across both partitions
+       Write output to HBM (async store)
+
+  3. MLP kernel:
+       Run MLP only for still-masked positions + active set
+       (predictions only needed at mask positions; active set needs update)
+
+  4. Predict:
+       Run LM head at masked positions → confidence scores
+       Unmask positions with confidence ≥ τ (FastDLLM parallel decode)
+
+  5. Update cache:
+       Commit new K,V for A_t positions back to HBM cache
+       Update drift proxy for next step's magnitude selection</div>
+  </div>
+
+  <h3>Key nuances that make this non-trivial</h3>
+  <div class="three-col">
+    <div class="card ba">
+      <h3 style="margin-top:0;font-size:0.9rem;color:var(--blue);">RoPE under permutation</h3>
+      <p style="font-size:0.82rem;">Rotary position embeddings bake the position index into Q and K. You can't freely reorder tokens then apply RoPE. Fix: carry position indices alongside packed rows, apply RoPE <em>after</em> gather. dKV-Cache appendix confirmed this is feasible.</p>
+    </div>
+    <div class="card ga">
+      <h3 style="margin-top:0;font-size:0.9rem;color:var(--green);">Two-partition softmax</h3>
+      <p style="font-size:0.82rem;">Standard FlashAttention computes softmax over one contiguous K. Here K is split: active (in SRAM) and cached (in HBM). Two-pass online softmax: compute partial (m, l) for each partition, then combine with the standard FlashAttention reduction formula.</p>
+    </div>
+    <div class="card ya">
+      <h3 style="margin-top:0;font-size:0.9rem;color:var(--yellow);">Voxel reordering</h3>
+      <p style="font-size:0.82rem;">Chipmunk reorders tokens into spatial voxels of size C=192 so each chunk shares one sparsity pattern. For MDMs: reorder by mask-state (all still-masked together, all decoded together). This reduces approximation error ~2× vs unstructured sparsity at the same compute budget.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- 06 THEORY -->
+<section id="theory">
+<div class="container">
+  <div class="sl">06 — Theoretical Analysis</div>
+  <h2>The formal error bound — why MDMs are harder than images</h2>
+
+  <p>Image diffusion errors are visually imperceptible — even large approximation errors don't change the perceptual output. Text is completely different: an error in K at position i can change the attention output at position j, which changes what token gets predicted at position j, which changes the entire downstream generation.</p>
+
+  <div class="two-col">
+    <div class="card oa">
+      <h3 style="margin-top:0;color:var(--orange);">The bidirectional cascade</h3>
+      <p style="font-size:0.85rem;">If K[i] has error ε at step t:</p>
+      <div class="eq" style="font-size:0.8rem;">Shift in attention output at j:
+  ≈ ε · (attn_weight[j→i]) · ||V[i]||
+
+This propagates: K[j] at step t+1 depends on
+the attention output at j, which just shifted.
+
+Cascade: ε → ε·α → ε·α² → ...
+where α = max attention weight &lt; 1</div>
+      <p style="font-size:0.85rem;margin-bottom:0;">If α &lt; 1 (attention is not fully concentrated on one position), the cascade is <strong>contractive</strong> — errors shrink geometrically rather than exploding. The bound holds.</p>
+    </div>
+    <div class="card ga">
+      <h3 style="margin-top:0;color:var(--green);">The bound (informal)</h3>
+      <div class="eq" style="font-size:0.8rem;">Inputs:
+  τ = magnitude threshold
+  M = anchor period
+  α = max attention weight
+
+Per-step error:
+  err_step ≤ C₁·τ + ε_numeric
+
+Cascade amplification:
+  G ≤ 1/(1−α)  (geometric series)
+
+M-step accumulated error:
+  err_M ≤ M · err_step · G
+
+After anchor:
+  err = 0  (exact reset)</div>
+      <p style="font-size:0.85rem;margin-bottom:0;">A formal version of this lets you <em>set M and τ from a target error rate</em> rather than sweeping empirically. First such bound in the MDM acceleration literature.</p>
+    </div>
+  </div>
+
+  <div class="callout y">
+    <strong>Why even a loose bound matters:</strong> DualDiffusion's heuristic verification rules (KL-divergence threshold, confidence threshold) have zero theoretical grounding — they fail on GSM8K. A formal bound, even loose, establishes that the method can preserve quality with appropriate hyperparameters, and identifies what assumptions are load-bearing. That's a genuine contribution even before the bound is tight.
+  </div>
+
+  <h3>Estimated theoretical work: 3–4 weeks</h3>
+  <p>Follows established techniques from sparse attention literature (Performers' approximation analysis, Reformer's LSH analysis). The proof template is known — the new work is applying it to the bidirectional cascade structure unique to MDMs.</p>
+</div>
+</section>
+
+
+<!-- 07 EXPERIMENTS -->
+<section id="experiments">
+<div class="container">
+  <div class="sl">07 — Experiments</div>
+  <h2>Benchmarks, targets, and what the numbers mean</h2>
+
+  <h3>Realistic expected speedups</h3>
+  <div class="stat-row">
+    <div class="stat"><span class="nb" style="color:var(--green);">2.5–4×</span><span class="lb">Per-step kernel speedup<br>vs dense attention<br>at 70% sparsity</span></div>
+    <div class="stat"><span class="nb" style="color:var(--blue);">1.3–2×</span><span class="lb">Over FastDLLM<br>in compute-bound<br>(HumanEval, RULER)</span></div>
+    <div class="stat"><span class="nb" style="color:var(--purple);">8–15×</span><span class="lb">Over vanilla LLaDA-8B<br>compute-bound<br>tasks</span></div>
+    <div class="stat"><span class="nb" style="color:var(--yellow);">30–50×</span><span class="lb">Over vanilla LLaDA-8B<br>long-generation<br>memory-bound</span></div>
+  </div>
+
+  <h3>Why HumanEval and RULER are the headline benchmarks</h3>
+  <div class="two-col">
+    <div class="card oa">
+      <h3 style="margin-top:0;color:var(--orange);">FastDLLM gets only 3.7× on HumanEval</h3>
+      <p style="font-size:0.85rem;">HumanEval is compute-bound: the response is code (moderate length), and the bottleneck is FLOPs, not memory bandwidth. Block-wise caching reduces memory I/O but doesn't reduce FLOPs. FastDLLM saturates at 3.7×.</p>
+      <p style="font-size:0.85rem;margin-bottom:0;">This proposal reduces <em>actual attention FLOPs</em> by operating at the position level (70% of positions skipped). That directly attacks the compute-bound bottleneck FastDLLM can't touch.</p>
+    </div>
+    <div class="card pa">
+      <h3 style="margin-top:0;color:var(--purple);">RULER 8K–32K is where O(L²) really bites</h3>
+      <p style="font-size:0.85rem;">RULER is a long-context benchmark. At L=32K, the dense attention matrix is 32K×32K = 1B entries per step. Even 70% sparsity reduces this to 300M — a real reduction, not a rounding error.</p>
+      <p style="font-size:0.85rem;margin-bottom:0;">No existing MDM acceleration paper has run long-context benchmarks. This is the greenfield territory where the expected speedup is highest.</p>
+    </div>
+  </div>
+
+  <h3>Baselines (in increasing sophistication)</h3>
+  <table>
+    <thead><tr><th>#</th><th>Baseline</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>LLaDA-8B dense (no acceleration)</td><td>Quality ceiling, speed floor</td></tr>
+      <tr><td>2</td><td>LLaDA-8B + FastDLLM PrefixCache</td><td>Best published method (cache only)</td></tr>
+      <tr><td>3</td><td>LLaDA-8B + FastDLLM DualCache + parallel</td><td class="tg">Best published overall (primary comparison)</td></tr>
+      <tr><td>4</td><td>LLaDA-8B + dKV-Cache-Decode</td><td>Closest to this work in spirit</td></tr>
+      <tr><td>5</td><td>Baselines 2–4 on H100 (nobody has done this)</td><td class="tg">Useful characterization even without this proposal's kernel</td></tr>
+      <tr><td>6</td><td>This proposal: kernel only</td><td>Isolate kernel contribution</td></tr>
+      <tr><td>7</td><td>This proposal + FastDLLM block cache</td><td>Layer 1+2 stack</td></tr>
+      <tr><td>8</td><td>Full stack (all three layers)</td><td>Maximum speedup claim</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Key ablations</h3>
+  <div class="two-col">
+    <div class="card">
+      <h3 style="margin-top:0;font-size:0.9rem;">Active selection signal</h3>
+      <p style="font-size:0.82rem;">Recency only | magnitude only | hybrid. Tests Hypothesis 1: does magnitude beat recency at fixed compute budget?</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;font-size:0.9rem;">Anchor period M</h3>
+      <p style="font-size:0.82rem;">M ∈ {3, 5, 7, 10, 15, 20}. Quality-speed Pareto tradeoff. Validates the error bound's predictions.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;font-size:0.9rem;">Active set fraction</h3>
+      <p style="font-size:0.82rem;">10%, 20%, 30%, 50% of L. Where does quality degrade? Where is compute saturated?</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;font-size:0.9rem;">A100 vs H100</h3>
+      <p style="font-size:0.82rem;">Tests Hypothesis 3: does H100's cp.async give superlinear speedup for the gather pattern vs A100's serialized loads?</p>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- 08 TIMELINE -->
+<section id="timeline">
+<div class="container">
+  <div class="sl">08 — Timeline</div>
+  <h2>6 months to a paper</h2>
+
+  <div class="month-grid">
+    <div class="month">
+      <div class="mnum">Month 1</div>
+      <div class="mtitle" style="color:var(--blue);">Reproduce baselines</div>
+      <div class="mdesc">Set up LLaDA-8B inference. Reproduce FastDLLM, dKV-Cache, DualDiffusion on MMLU, GSM8K, HumanEval within 5% of published numbers. Run all on H100 — nobody has done this.</div>
+      <div class="mgoal">Deliverable: H100 characterization table for all existing methods</div>
+    </div>
+    <div class="month">
+      <div class="mnum">Month 2</div>
+      <div class="mtitle" style="color:var(--green);">Kernel v1 — gather-pack-wgmma</div>
+      <div class="mdesc">Write the cp.async + wgmma kernel in ThunderKittens. No caching yet — recompute all positions but use the packed-compute pattern. Verify bit-correctness against dense LLaDA.</div>
+      <div class="mgoal">Deliverable: 1.3–1.8× per-step speedup, bit-correct</div>
+    </div>
+    <div class="month">
+      <div class="mnum">Month 3</div>
+      <div class="mtitle" style="color:var(--green);">Kernel v2 — K/V cache + delta</div>
+      <div class="mdesc">Add HBM cache layout, scattered commit, two-partition softmax, re-anchor scheduling. Hyperparameter sweeps on M and active fraction.</div>
+      <div class="mgoal">Deliverable: 2.5–3× per-step at no quality cost on MMLU</div>
+    </div>
+    <div class="month">
+      <div class="mnum">Month 4</div>
+      <div class="mtitle" style="color:var(--orange);">Active selection ablation</div>
+      <div class="mdesc">Implement and compare recency-only, magnitude-only, hybrid selection. Compose with FastDLLM (Layer 1+2 stack). All ablations from §5.6.</div>
+      <div class="mgoal">Deliverable: ablation table, Layer 1+2 composition result</div>
+    </div>
+    <div class="month">
+      <div class="mnum">Month 5</div>
+      <div class="mtitle" style="color:var(--purple);">Theory + spec decoding</div>
+      <div class="mdesc">Write the formal error bound. Compose with DualDiffusion-style spec decoding (Layer 3). Verify quality on GSM8K (where DualDiffusion currently fails). Run RULER 8K–32K.</div>
+      <div class="mgoal">Deliverable: error bound proof, full-stack speedup on RULER</div>
+    </div>
+    <div class="month">
+      <div class="mnum">Month 6</div>
+      <div class="mtitle" style="color:var(--yellow);">Paper + release</div>
+      <div class="mdesc">Polish ThunderKittens code for open-source release. Final ablations including A100 vs H100 comparison. Write paper. Submit to MLSys 2027 or ICLR 2027.</div>
+      <div class="mgoal">Deliverable: submitted paper + public kernel code</div>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:24px;">
+    <strong>Critical path:</strong> Months 2–3 (kernel v1 → v2). If kernel work falls behind, theory and spec-decoding composition (Months 4–5) can run in parallel. The Month 1 H100 characterization is a useful intermediate result even if the rest is delayed.
+  </div>
+</div>
+</section>
+
+
+<!-- 09 WHY DAN -->
+<section id="why">
+<div class="container">
+  <div class="sl">09 — Why Dan Fu's Group?</div>
+  <h2>Why this is structurally the right fit</h2>
+
+  <div class="card ga">
+    <h3 style="margin-top:0;color:var(--green);">Direct lineage from Dan's own papers</h3>
+    <table style="margin-top:12px;">
+      <thead><tr><th>Paper</th><th>Relevance</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Chipmunk</strong> (Silveria, Govande, Fu 2025)</td><td class="tg">This proposal IS a port of Chipmunk. Dan is the senior author.</td></tr>
+        <tr><td><strong>ThunderKittens</strong> (Spector, Fu et al. 2024)</td><td class="tg">The kernel DSL used to implement everything. Already set up in the group.</td></tr>
+        <tr><td><strong>FlashAttention</strong> (Dao, Fu et al. 2022)</td><td>IO-aware kernel design pattern this proposal extends.</td></tr>
+        <tr><td><strong>Monarch Mixer / M2</strong> (Fu et al. 2023)</td><td>Structured sparsity counterpart to this proposal's dynamic sparsity — same philosophical lineage.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="two-col">
+    <div class="card ba">
+      <h3 style="margin-top:0;color:var(--blue);">Practical advantages</h3>
+      <ul style="color:#cbd5e1;padding-left:18px;font-size:0.85rem;">
+        <li>Direct access to Chipmunk authors (Silveria at Together, Govande at Stanford) for technical advisory</li>
+        <li>ThunderKittens infrastructure already in place — no setup cost</li>
+        <li>H100 access via Together AI partnership</li>
+        <li>Existing paper-writing pipeline and reviewer relationships at MLSys/ICLR</li>
+        <li>Potential co-authorship with Chipmunk authors → stronger paper with name recognition</li>
+      </ul>
+    </div>
+    <div class="card pa">
+      <h3 style="margin-top:0;color:var(--purple);">Narrative fit</h3>
+      <p style="font-size:0.85rem;">"Hazy Research group takes their own kernel toolkit and applies it to a new model class (MDMs), stacks with existing algorithmic work (FastDLLM, dKV-Cache, DualDiffusion), and provides the first hardware-aware acceleration for MDMs."</p>
+      <p style="font-size:0.85rem;margin-bottom:0;">This is composable with concurrent work rather than competing with it — a much cleaner story for a group that has relationships with the FastDLLM (NVIDIA) and dKV-Cache (NUS) teams.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- 10 OPEN QUESTIONS -->
+<section id="openqs" style="border-bottom:none;">
+<div class="container">
+  <div class="sl">10 — Open Questions</div>
+  <h2>Six questions for the advisor meeting</h2>
+
+  <div class="q-row">
+    <div class="q-num">Q1 — PRIORITY</div>
+    <div class="q-text" style="color:#fca5a5;font-weight:600;">Is anyone in your group, Sandy Research, or Inception Labs already doing this? Sanity check before deep investment. The field is small enough that direct asking saves months.</div>
+  </div>
+
+  <div class="q-row">
+    <div class="q-num">Q2 — RESOURCES</div>
+    <div class="q-text">Mercury API access? Inception Labs sometimes provides academic access. Would broaden empirical evaluation significantly.</div>
+  </div>
+
+  <div class="q-row">
+    <div class="q-num">Q3 — AUTHORSHIP</div>
+    <div class="q-text">Co-authorship with Chipmunk authors (Silveria / Govande)? They have the kernel craft; involving them turns this into a stronger paper with immediate credibility in the systems community.</div>
+  </div>
+
+  <div class="q-row">
+    <div class="q-num">Q4 — VENUE</div>
+    <div class="q-text">MLSys vs ICLR vs NeurIPS framing? Heavy kernels lean MLSys; theoretical bound + algorithmic spec composition leans ICLR. MLSys 2027 (March deadline) feels like the most natural fit — kernel work is the core contribution.</div>
+  </div>
+
+  <div class="q-row">
+    <div class="q-num">Q5 — SCOPE</div>
+    <div class="q-text">Should the speculative decoding / drafter design be a separate paper? The drafter design space (Medusa, EAGLE, self-spec, lookahead) is large. Could split into two papers if scope balloons — kernel paper first, drafter paper as follow-up.</div>
+  </div>
+
+  <div class="q-row">
+    <div class="q-num">Q6 — THEORY</div>
+    <div class="q-text">Is the formal error bound worth 3–4 weeks of focused work? It's novel for MDMs. But if you'd rather see kernel speedup first and add theory later, that's a reasonable order-of-operations. The bound is more "credibility" than "critical path."</div>
+  </div>
+
+  <h3>Honest summary from the proposal</h3>
+  <div class="callout g">
+    <strong>The opening is real, smaller than first claimed, but defensible.</strong><br><br>
+    FastDLLM gets 27.6× algorithmically. The headline isn't "beat FastDLLM" — it's "1.3–2× on top of FastDLLM in the compute-bound regime where FastDLLM only gets 3–4×." That's the honest claim. The kernel-level work (cp.async gather, SRAM packing, wgmma, magnitude selection, formal error bound) has not been done for MDMs and is explicitly invited. Dan Fu literally wrote the Chipmunk paper. ThunderKittens is already deployed in the group. The methodology transfers nearly mechanically. <strong>This is the right project, at the right time, at the right group.</strong>
+  </div>
+
+  <div class="callout r" style="margin-top:16px;">
+    <strong>Primary risk:</strong> FastDLLM saturates the speedup ceiling and there's nothing left to claim beyond a characterization paper. <strong>Mitigation:</strong> Month 1 characterizes first. If the kernel-level work genuinely adds &lt;1.2× over FastDLLM across the board, pivot to framing it as "first MDM kernel work on Hopper" — a solid systems contribution even without a headline speedup number.
+  </div>
+</div>
+</section>
+
+<div style="text-align:center;padding:28px;color:var(--muted);font-size:0.8rem;border-top:1px solid var(--border);">
+  Proposal: Utkarsh Ranjan · UCSD · Target advisor: Dan Y. Fu · Draft v2, May 2026<br>
+  Building on: Chipmunk (arXiv:2506.03275) · FastDLLM (arXiv:2505.22618) · dKV-Cache (arXiv:2505.15781) · LLaDA (arXiv:2502.09992)
+</div>
+
+</body>
+</html>

@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLaDA: Large Language Diffusion with mAsking — Explained</title>
+<style>
+  :root {
+    --bg: #0f1117; --bg2: #181c27; --bg3: #1e2333; --border: #2a3050;
+    --text: #e2e8f0; --muted: #8892aa;
+    --green: #4ade80; --orange: #fb923c; --blue: #60a5fa;
+    --purple: #a78bfa; --pink: #f472b6; --yellow: #facc15; --red: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.7; font-size: 16px; }
+
+  .hero { background: linear-gradient(135deg, #0f1117 0%, #0a1a2e 50%, #0f1117 100%); border-bottom: 1px solid var(--border); padding: 60px 40px 50px; text-align: center; }
+  .hero h1 { font-size: 2.6rem; font-weight: 800; background: linear-gradient(90deg, #60a5fa, #4ade80, #facc15); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 16px; }
+  .hero .subtitle { color: var(--muted); font-size: 1.05rem; max-width: 720px; margin: 0 auto 24px; }
+  .pill-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+  .pill { background: var(--bg3); border: 1px solid var(--border); border-radius: 999px; padding: 4px 14px; font-size: 0.82rem; color: var(--muted); }
+  .pill.hl { border-color: var(--green); color: var(--green); }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; color: #f1f5f9; }
+  h3 { font-size: 1.1rem; font-weight: 600; margin: 28px 0 12px; color: var(--blue); }
+  p { color: #cbd5e1; margin-bottom: 14px; }
+  .slabel { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--purple); margin-bottom: 6px; }
+
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 20px 0; }
+  .card.ga { border-left: 3px solid var(--green); }
+  .card.oa { border-left: 3px solid var(--orange); }
+  .card.ba { border-left: 3px solid var(--blue); }
+  .card.pa { border-left: 3px solid var(--purple); }
+  .card.ya { border-left: 3px solid var(--yellow); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+
+  .callout { background: #172032; border: 1px solid #2563eb44; border-left: 3px solid var(--blue); border-radius: 8px; padding: 16px 20px; margin: 18px 0; font-size: 0.93rem; color: #93c5fd; }
+  .callout.o { background: #1f1508; border-color: #f97316aa; border-left-color: var(--orange); color: #fdba74; }
+  .callout.g { background: #0a1f14; border-color: #22c55e44; border-left-color: var(--green); color: #86efac; }
+  .callout.y { background: #1a1600; border-color: #facc1544; border-left-color: var(--yellow); color: #fde68a; }
+  .callout.r { background: #1f0a0a; border-color: #f8717144; border-left-color: var(--red); color: #fca5a5; }
+
+  pre { background: #0d1117; border: 1px solid var(--border); border-radius: 10px; padding: 20px; font-size: 0.82rem; overflow-x: auto; color: #e2e8f0; line-height: 1.6; margin: 16px 0; white-space: pre; }
+  .kw { color: #a78bfa; } .cm { color: #6b7280; } .num { color: #fb923c; } .str { color: #4ade80; }
+
+  .eq { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; font-family: 'Courier New', monospace; font-size: 0.88rem; color: var(--yellow); margin: 12px 0; overflow-x: auto; white-space: pre; line-height: 1.6; }
+
+  .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0; }
+  .stat { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; text-align: center; min-width: 130px; }
+  .stat .nb { font-size: 2rem; font-weight: 800; display: block; line-height: 1; margin-bottom: 4px; }
+  .stat .lb { font-size: 0.78rem; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.88rem; }
+  th { background: var(--bg3); border: 1px solid var(--border); padding: 10px 14px; text-align: left; color: var(--muted); font-weight: 600; }
+  td { border: 1px solid var(--border); padding: 10px 14px; color: var(--text); }
+  tr:nth-child(even) td { background: var(--bg2); }
+  .tg { color: var(--green); font-weight: 700; }
+  .ty { color: var(--yellow); }
+  .tr { color: var(--red); }
+
+  .toc { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 32px 0 0; }
+  .toc h4 { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+  .toc a { display: block; color: #94a3b8; text-decoration: none; padding: 4px 0; font-size: 0.88rem; }
+  .toc a:hover { color: var(--blue); }
+  .toc a::before { content: '→  '; color: var(--border); }
+
+  .seq-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 16px 0; font-family: monospace; font-size: 0.85rem; }
+  .tok-m { background: #2d1f3a; border: 1px solid var(--purple); border-radius: 4px; padding: 4px 8px; color: var(--purple); }
+  .tok-u { background: #1a3a1a; border: 1px solid var(--green); border-radius: 4px; padding: 4px 8px; color: var(--green); }
+  .tok-p { background: #1f1508; border: 1px solid var(--orange); border-radius: 4px; padding: 4px 8px; color: var(--orange); }
+  .arrow { color: var(--muted); font-size: 1.1rem; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="container">
+    <h1>LLaDA</h1>
+    <p class="subtitle">Large Language Diffusion with mAsking — Scaling Masked Diffusion Models to 8B Parameters for Competitive Language Generation</p>
+    <div class="pill-row">
+      <span class="pill">Nie, Zhu, You et al. · Renmin University · 2025</span>
+      <span class="pill">arXiv:2502.09992</span>
+      <span class="pill hl">Competitive with LLaMA-3-8B on GSM8K · Fully bidirectional attention</span>
+    </div>
+    <div class="toc">
+      <h4>Contents — read in order</h4>
+      <a href="#why">01 — Why Not Autoregressive? The case for diffusion in language</a>
+      <a href="#forward">02 — The Forward Process: Masking tokens progressively</a>
+      <a href="#reverse">03 — The Reverse Process: Generating by unmasking</a>
+      <a href="#bidir">04 — Why Bidirectional Attention is Required</a>
+      <a href="#arch">05 — Architecture and Training Objective</a>
+      <a href="#inference">06 — Inference: Decoding Strategies</a>
+      <a href="#results">07 — Results vs Autoregressive Models</a>
+      <a href="#bottleneck">08 — The Fundamental Bottleneck: Why it's slow</a>
+    </div>
+  </div>
+</div>
+
+
+<!-- 01 WHY -->
+<section id="why">
+<div class="container">
+  <div class="slabel">01 — Motivation</div>
+  <h2>Why not just use autoregressive LLMs?</h2>
+
+  <p>Autoregressive models (GPT, LLaMA) generate text left-to-right, one token at a time. Each token is conditioned only on what came before. This has two structural consequences:</p>
+
+  <div class="two-col">
+    <div class="card oa">
+      <h3 style="margin-top:0;color:var(--orange)">Autoregressive (GPT / LLaMA)</h3>
+      <pre style="font-size:0.78rem;">Prompt: "The cat sat on"
+Generate:
+  p("the" | "The cat sat on")       → "the"
+  p("mat" | "The cat sat on the")   → "mat"
+  p("." | "The cat sat on the mat") → "."
+
+Order: strictly left-to-right
+Context: only past tokens (causal mask)</pre>
+      <p style="font-size:0.83rem;color:var(--muted);margin-top:8px;">Fast at generation (KV cache works). But each token only sees its left context — cannot revise earlier tokens.</p>
+    </div>
+    <div class="card ga">
+      <h3 style="margin-top:0;color:var(--green)">Masked Diffusion (LLaDA)</h3>
+      <pre style="font-size:0.78rem;">Start: [M][M][M][M][M][M]   (fully masked)
+Step 1: [M][M] sat [M][M][M]
+Step 2: [M] cat sat on [M][M]
+Step 3: The cat sat on the [M]
+Step 4: The cat sat on the mat
+
+Order: all positions simultaneously
+Context: ALL tokens (bidirectional)</pre>
+      <p style="font-size:0.83rem;color:var(--muted);margin-top:8px;">Slower per-step (no KV cache). But every token sees ALL other tokens — richer context, can predict any position using full sequence context.</p>
+    </div>
+  </div>
+
+  <div class="callout g">
+    <strong>The key promise:</strong> By using bidirectional attention, LLaDA can predict token at position 50 using tokens at positions 1–49 AND 51–100. An autoregressive model predicting position 50 can only see positions 1–49.
+  </div>
+
+  <h3>Where bidirectional context wins</h3>
+  <p>Tasks where the answer depends on both left AND right context:</p>
+  <div class="card">
+    <div class="eq">Fill-in-the-middle:
+  "The [MASK] is the capital of France."
+  → Bidirectional: sees "capital of France" → "Paris" ✓
+  → Causal: at position of [MASK], can't see "capital of France" ✗
+
+Infilling code:
+  def add(a, b):    def add(a, b):
+      [MASK]     →      return a + b
+  return result
+
+Long-form reasoning: later parts of the reasoning chain
+inform what earlier statements should have said.</div>
+  </div>
+</div>
+</section>
+
+
+<!-- 02 FORWARD -->
+<section id="forward">
+<div class="container">
+  <div class="slabel">02 — Forward Process (Training)</div>
+  <h2>The Forward Process: Masking tokens progressively</h2>
+
+  <p>LLaDA uses <strong>masking as the noise process</strong>. Unlike image diffusion which adds Gaussian noise, here noise = replacing tokens with [MASK].</p>
+
+  <h3>The masking schedule</h3>
+  <div class="eq">At time t ∈ [0, 1], each token i is independently masked with probability t:
+
+  q_{t|0}( x_t^i | x_0^i ) =
+    (1 - t) · δ_{x_0^i}    ← stay as original with prob (1-t)
+  +   t   · δ_{[MASK]}     ← become [MASK]    with prob t
+
+t = 0 → no masking   (clean text)
+t = 1 → fully masked  ([M][M][M]...[M])</div>
+
+  <h3>Visual: masking at different noise levels</h3>
+  <div class="card">
+    <p style="font-size:0.83rem;color:var(--muted);">Same sentence, progressively more masked as t increases:</p>
+    <div style="margin:12px 0;">
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:6px;">t = 0.0 (clean):</div>
+      <div class="seq-row">
+        <span class="tok-u">The</span><span class="tok-u">cat</span><span class="tok-u">sat</span><span class="tok-u">on</span><span class="tok-u">the</span><span class="tok-u">mat</span>
+      </div>
+      <div style="font-size:0.8rem;color:var(--muted);margin:12px 0 6px;">t = 0.33 (light noise):</div>
+      <div class="seq-row">
+        <span class="tok-u">The</span><span class="tok-m">[M]</span><span class="tok-u">sat</span><span class="tok-u">on</span><span class="tok-m">[M]</span><span class="tok-u">mat</span>
+      </div>
+      <div style="font-size:0.8rem;color:var(--muted);margin:12px 0 6px;">t = 0.67 (heavy noise):</div>
+      <div class="seq-row">
+        <span class="tok-u">The</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-u">mat</span>
+      </div>
+      <div style="font-size:0.8rem;color:var(--muted);margin:12px 0 6px;">t = 1.0 (full noise):</div>
+      <div class="seq-row">
+        <span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key difference from image diffusion:</strong> Image diffusion uses continuous Gaussian noise (every pixel gets perturbed). Masked diffusion uses discrete binary noise (each token is either clean or fully masked). There's no partial corruption of a token — it's all-or-nothing.
+  </div>
+
+  <h3>Why masking? (vs other discrete noise)</h3>
+  <div class="card ya">
+    <p style="font-size:0.85rem;">Masking (absorbing state diffusion) has a crucial property: <strong>the model always knows which positions were masked</strong>. Unlike Gaussian noise where you can't tell signal from noise, with masking you know exactly where to predict.</p>
+    <div class="eq">Other noise: replace "cat" with "xyz" (random token)
+  → Model sees: "The xyz sat on the mat"
+  → Model doesn't know "xyz" is noisy vs meaningful
+
+Masking: replace "cat" with [MASK]
+  → Model sees: "The [M] sat on the mat"
+  → Model knows: position 2 needs to be predicted</div>
+    <p style="font-size:0.83rem;color:var(--muted);margin-top:8px;">This simplification leads to a cleaner training objective and better empirical performance.</p>
+  </div>
+</div>
+</section>
+
+
+<!-- 03 REVERSE -->
+<section id="reverse">
+<div class="container">
+  <div class="slabel">03 — Reverse Process (Generation)</div>
+  <h2>The Reverse Process: Generating by unmasking</h2>
+
+  <p>Generation runs the process backward: start from fully masked, gradually unmask until you have complete text.</p>
+
+  <h3>One reverse step: from noise level t to s (s &lt; t)</h3>
+  <div class="eq">For each token position i, at one reverse step (t → s):
+
+Case 1: token was already unmasked (x_t^i ≠ [MASK])
+  → It stays unmasked. x_s^i = x_t^i  (locked in forever)
+
+Case 2: token is still masked (x_t^i = [MASK])
+  → With prob s/t:     stays masked   (not yet ready)
+  → With prob (t-s)/t: gets unmasked! Use model's prediction:
+                        x_s^i = model's predicted token at position i</div>
+
+  <div class="callout y">
+    <strong>Key insight:</strong> Once a token is unmasked, it <em>stays</em> unmasked. Tokens are "absorbed" into their final state. Only masked tokens are in play at each step. This is why it's called an "absorbing state" Markov chain.
+  </div>
+
+  <h3>Full generation walkthrough (T=4 steps)</h3>
+  <div class="card ba">
+    <p style="font-size:0.83rem;color:var(--muted);margin-bottom:16px;">Generating a 6-token response. Green = unmasked (final), purple = still masked, orange = just unmasked this step.</p>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;">Step 0 — Start (t=1.0, all masked):</div>
+      <div class="seq-row"><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span></div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;">Step 1 — t=0.75→0.5, model predicts all, unmask 2 most confident:</div>
+      <div class="seq-row"><span class="tok-m">[M]</span><span class="tok-p">cat</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-p">mat</span></div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;">Step 2 — t=0.5→0.25, model predicts remaining masked, unmask 2 more:</div>
+      <div class="seq-row"><span class="tok-p">The</span><span class="tok-u">cat</span><span class="tok-m">[M]</span><span class="tok-m">[M]</span><span class="tok-p">the</span><span class="tok-u">mat</span></div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;">Step 3 — t=0.25→0.0, unmask final 2:</div>
+      <div class="seq-row"><span class="tok-u">The</span><span class="tok-u">cat</span><span class="tok-p">sat</span><span class="tok-p">on</span><span class="tok-u">the</span><span class="tok-u">mat</span></div>
+    </div>
+
+    <div style="margin-bottom:6px;">
+      <div style="font-size:0.78rem;color:var(--green);margin-bottom:6px;">Final output (t=0.0):</div>
+      <div class="seq-row"><span class="tok-u">The</span><span class="tok-u">cat</span><span class="tok-u">sat</span><span class="tok-u">on</span><span class="tok-u">the</span><span class="tok-u">mat</span></div>
+    </div>
+  </div>
+
+  <h3>τ-leaping: unmasking multiple tokens per step</h3>
+  <p>The exact reverse process unmasks one token per step (very slow for long sequences). <strong>τ-leaping</strong> is an approximation that unmasks multiple tokens per step — trading quality for speed.</p>
+  <div class="card">
+    <div class="eq">Exact reverse:  1 token per step × L steps = L total steps
+τ-leaping:      k tokens per step → L/k steps   (k× faster)
+
+Quality vs speed:
+  k=1  (sequential):  best quality, slowest
+  k=L  (all at once): fastest, worst quality — tokens sampled
+                       independently, ignoring dependencies
+  LLaDA default: k dynamically set by confidence threshold</div>
+  </div>
+</div>
+</section>
+
+
+<!-- 04 BIDIR -->
+<section id="bidir">
+<div class="container">
+  <div class="slabel">04 — Why Bidirectional Attention</div>
+  <h2>Why bidirectional attention is required</h2>
+
+  <p>This is the most important architectural consequence of masked diffusion — and the root cause of why KV cache doesn't work.</p>
+
+  <h3>The core problem with causal attention</h3>
+  <div class="card oa">
+    <p style="font-size:0.85rem;">Suppose we're predicting position 2 ("cat") in <code>The [M] sat on the mat</code>.</p>
+    <div class="eq">What the model sees to predict position 2:
+
+  CAUSAL (autoregressive mask):
+    Position 2 can see: "The" only
+    Cannot see: "sat on the mat"
+    → Very hard to predict "cat" without right context
+
+  BIDIRECTIONAL (no mask):
+    Position 2 can see: "The", "sat", "on", "the", "mat"
+    → Obvious: "The ___ sat on the mat" → "cat"</div>
+    <div class="callout o" style="margin-top:12px;">With causal attention, predicting a masked token early in the sequence would be nearly impossible — it can't see the words after it. Bidirectional attention is <em>logically required</em> for masked prediction to work well.</div>
+  </div>
+
+  <h3>Why this breaks KV cache</h3>
+  <div class="card ya">
+    <p style="font-size:0.85rem;">In autoregressive models, the KV cache works because <strong>old tokens' attention outputs don't change when new tokens are added</strong> — the causal mask prevents old tokens from attending to new tokens.</p>
+    <div class="eq">AUTOREGRESSIVE (causal mask):
+  Step: generate token 51
+  Tokens 1–50: already generated, cached K,V
+  Token 50's output A_50 = f(tokens 1–50 only)
+  Adding token 51 does NOT change A_50   → cache valid ✓
+
+BIDIRECTIONAL (no causal mask):
+  Step: unmask token 30 (was [MASK], now "Paris")
+  Token 29's K,V don't change  (K_29 = x_29 · W_K, same)
+  BUT token 29's output DOES change:
+    A_29_before = f(... K_30=[MASK] ...)
+    A_29_after  = f(... K_30=K["Paris"] ...)
+  → Every token's output is stale when any token changes → cache invalid ✗</div>
+    <p style="font-size:0.83rem;color:var(--muted);margin-top:8px;">This is why LLaDA cannot use a standard KV cache. Each denoising step requires a full O(L²) recompute of all attention.</p>
+  </div>
+
+  <h3>Summary: causal vs bidirectional tradeoffs</h3>
+  <table>
+    <thead><tr><th>Property</th><th>Causal (Autoregressive)</th><th>Bidirectional (LLaDA)</th></tr></thead>
+    <tbody>
+      <tr><td>Context for prediction</td><td>Left side only</td><td class="tg">All tokens (left + right)</td></tr>
+      <tr><td>KV cache</td><td class="tg">Yes — exact, O(L) per new token</td><td class="tr">No — full O(L²) every step</td></tr>
+      <tr><td>Fill-in-the-middle</td><td class="tr">Hard (no right context)</td><td class="tg">Natural</td></tr>
+      <tr><td>Generation order</td><td>Fixed left-to-right</td><td class="tg">All positions simultaneously</td></tr>
+      <tr><td>Token dependency</td><td>Handled exactly</td><td class="ty">Approximated (independence assumption)</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+
+<!-- 05 ARCH -->
+<section id="arch">
+<div class="container">
+  <div class="slabel">05 — Architecture & Training</div>
+  <h2>Architecture and Training Objective</h2>
+
+  <h3>The transformer architecture</h3>
+  <p>LLaDA uses a <strong>standard transformer</strong> — same as LLaMA — with one critical change: the causal mask is removed. Every token attends to every other token.</p>
+  <div class="card ba">
+    <div class="eq">LLaDA-8B transformer block (same structure as LLaMA-3-8B):
+
+  Input: x ∈ R^{L × D}     (L tokens, D=4096 hidden dim)
+
+  1. RMSNorm(x)
+  2. Self-Attention (NO causal mask — fully bidirectional)
+     Q = x W_Q,  K = x W_K,  V = x W_V
+     A = softmax(Q K^T / √d) V   ← all L×L attention scores
+  3. Residual: x = x + A
+  4. RMSNorm(x)
+  5. SwiGLU MLP
+  6. Residual
+
+  Repeated 32 times (LLaDA-8B has 32 layers)
+  Output: logits over vocabulary for each position</div>
+    <p style="font-size:0.83rem;color:var(--muted);margin-top:8px;">The model also receives the noise level t as conditioning — similar to how DiT conditions on timestep. This lets the model know how noisy the input is.</p>
+  </div>
+
+  <h3>Special tokens</h3>
+  <div class="card">
+    <div class="eq">Sequence structure:
+  [prompt tokens ...] [response tokens / [MASK] tokens ...]
+
+  Prompt: never masked — always visible (prefix)
+  Response: partially masked during training and inference
+
+  [MASK] token: a dedicated embedding in the vocabulary
+  → Not a word, just "something should go here"</div>
+  </div>
+
+  <h3>Training objective (simplified)</h3>
+  <p>At each training step:</p>
+  <div class="card ga">
+    <div class="eq">1. Sample a clean text sequence x_0
+2. Sample a noise level t ~ Uniform(0, 1)
+3. Randomly mask each response token with prob t → get x_t
+4. Run transformer: p_θ(x_0 | x_t)
+5. Loss: cross-entropy at masked positions only
+
+L_MDM = E_t [ (1/t) · Σ_{i: x_t^i = [MASK]} -log p_θ(x_0^i | x_t) ]
+
+Intuition: "Given a partially masked sequence, predict the
+original tokens at masked positions."
+
+This is exactly BERT's Masked Language Modeling (MLM)
+but with a continuous masking rate t and weighted by 1/t.</div>
+    <div class="callout g" style="margin-top:12px;">The 1/t weight matters: at low t (few tokens masked), predicting them is easy but less informative. Weighting by 1/t upweights the harder, high-noise cases. In practice this simplifies to a standard cross-entropy objective over masked positions.</div>
+  </div>
+</div>
+</section>
+
+
+<!-- 06 INFERENCE -->
+<section id="inference">
+<div class="container">
+  <div class="slabel">06 — Inference</div>
+  <h2>Inference: Decoding Strategies</h2>
+
+  <p>Given a prompt, LLaDA generates the response by running the reverse process — starting from all-masked response tokens and iteratively unmasking them.</p>
+
+  <h3>Basic inference algorithm</h3>
+  <pre><span class="kw">def</span> llada_generate(model, prompt, response_len, T=<span class="num">1024</span>):
+    <span class="cm"># Start: prompt visible, response fully masked</span>
+    x = [prompt_tokens] + [[MASK]] * response_len
+
+    <span class="kw">for</span> step <span class="kw">in</span> range(T, <span class="num">0</span>, -<span class="num">1</span>):
+        t = step / T                   <span class="cm"># current noise level</span>
+        s = (step - <span class="num">1</span>) / T            <span class="cm"># next noise level</span>
+
+        <span class="cm"># Full forward pass: O(L²) attention over all tokens</span>
+        logits = model(x, timestep=t)  <span class="cm"># shape: [L, vocab_size]</span>
+
+        <span class="cm"># Compute confidence for each masked position</span>
+        confidence = softmax(logits).max(dim=-<span class="num">1</span>)  <span class="cm"># max prob</span>
+
+        <span class="cm"># Decide which to unmask this step</span>
+        n_unmask = round((t - s) * response_len)    <span class="cm"># proportional</span>
+        unmask_idx = topk(confidence[masked_positions], n_unmask)
+
+        <span class="cm"># Sample and lock in those tokens</span>
+        x[unmask_idx] = sample(logits[unmask_idx])
+
+    <span class="kw">return</span> x[len(prompt_tokens):]</pre>
+
+  <h3>The decoding spectrum: quality vs speed</h3>
+  <div class="card">
+    <div class="eq">Response length L, T denoising steps, tokens unmasked per step k:
+
+Sequential (k=1):
+  T = L steps, 1 token per step
+  → Each unmasked token sees ALL previously unmasked tokens
+  → Best quality, slowest
+
+Parallel (k=L):
+  T = 1 step, all tokens at once
+  → Tokens sampled independently — ignores dependencies
+  → "full house" problem (incoherent combinations)
+  → Fastest, worst quality
+
+LLaDA default (top-K per step):
+  T ≈ L/K steps
+  → Good balance but K is a fixed hyperparameter
+  → LLaDA finds best results at small K (near-sequential)</div>
+  </div>
+
+  <div class="callout r">
+    <strong>The dependency problem:</strong> "The poker hand consists of two words: [M] [M]."
+    Sampling position A independently might give "high", sampling position B independently might give "house".
+    Combined: "high house" — not a valid poker hand.
+    They should be sampled jointly ("full house", "high card") but the model only gives independent marginal probabilities.
+  </div>
+
+  <h3>Why LLaDA uses 1024 steps</h3>
+  <div class="card">
+    <div class="eq">For a 1024-token response:
+  Ideal: unmask 1 token per step → 1024 steps needed
+
+With T=1024 and sequential decoding (top-1 per step):
+  Each forward pass: O(L²) = O(1024²) ≈ 1M attention ops
+  Total: 1024 forward passes
+  → 1024 × O(L²) = 1 billion attention operations
+
+vs LLaMA generating same 1024 tokens:
+  1024 × O(L) with KV cache ≈ 1 million attention ops (1000× less)</div>
+    <p style="font-size:0.83rem;color:var(--muted);margin-top:8px;">This is the fundamental efficiency gap LLaDA faces vs autoregressive models. It's why acceleration is critical.</p>
+  </div>
+</div>
+</section>
+
+
+<!-- 07 RESULTS -->
+<section id="results">
+<div class="container">
+  <div class="slabel">07 — Results</div>
+  <h2>Results: Competitive with LLaMA-3-8B</h2>
+
+  <p>LLaDA-8B-Instruct achieves competitive performance with LLaMA-3-8B on key benchmarks, demonstrating that masked diffusion can match autoregressive quality at scale.</p>
+
+  <div class="stat-row">
+    <div class="stat"><span class="nb" style="color:var(--green)">8B</span><span class="lb">Parameters<br>LLaDA-8B-Instruct</span></div>
+    <div class="stat"><span class="nb" style="color:var(--blue)">79%</span><span class="lb">GSM8K (5-shot)<br>math reasoning</span></div>
+    <div class="stat"><span class="nb" style="color:var(--yellow)">42%</span><span class="lb">HumanEval<br>code generation</span></div>
+    <div class="stat"><span class="nb" style="color:var(--purple)">1024</span><span class="lb">Denoising steps<br>default for quality</span></div>
+  </div>
+
+  <table>
+    <thead><tr><th>Model</th><th>Type</th><th>GSM8K</th><th>HumanEval</th><th>KV Cache</th><th>Generation</th></tr></thead>
+    <tbody>
+      <tr><td>LLaMA-3-8B</td><td>Autoregressive</td><td class="tg">~79%</td><td class="tg">~62%</td><td class="tg">Yes</td><td>Left-to-right</td></tr>
+      <tr><td>LLaDA-8B-Instruct</td><td>Masked Diffusion</td><td class="tg">~79%</td><td class="ty">~42%</td><td class="tr">No</td><td>All positions simultaneously</td></tr>
+      <tr><td>Dream-7B</td><td>Masked Diffusion</td><td class="ty">~75%</td><td class="ty">~49%</td><td class="tr">No</td><td>All positions simultaneously</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>Why HumanEval is lower (~42% vs ~62%):</strong> Code generation has stronger sequential dependencies — earlier lines constrain later ones in a way that's harder to capture with bidirectional parallel decoding. This is also why acceleration is hardest for code: parallel decoding quality degrades most here.
+  </div>
+
+  <h3>The advantage: bidirectional context tasks</h3>
+  <div class="card ga">
+    <p style="font-size:0.85rem;">LLaDA particularly shines on tasks requiring global coherence and fill-in-the-middle reasoning. On some infilling benchmarks, LLaDA outperforms autoregressive models of similar size — because seeing both left and right context is a genuine advantage, not just an architectural curiosity.</p>
+  </div>
+</div>
+</section>
+
+
+<!-- 08 BOTTLENECK -->
+<section id="bottleneck">
+<div class="container">
+  <div class="slabel">08 — The Bottleneck</div>
+  <h2>The Fundamental Bottleneck: Why LLaDA is slow</h2>
+
+  <p>LLaDA is competitive in quality but dramatically slower than autoregressive models at inference. Here is exactly why.</p>
+
+  <div class="card oa">
+    <h3 style="margin-top:0;color:var(--orange)">Cost per generated token (LLaDA vs LLaMA)</h3>
+    <div class="eq">Setting: generate 1024 tokens from a 256-token prompt
+  L = 1280 total sequence length, D = 4096, H = 32 heads
+
+LLaMA-3-8B (autoregressive + KV cache):
+  Per new token: Q @ K_cached^T = [1, 128] @ [128, L_so_far]
+  Per new token ops: O(L_so_far · d) ≈ O(1280 · 128) = 163k FLOPs/head
+  Total for 1024 tokens: 1024 × 163k × 32 heads ≈ 5.3B FLOPs
+
+LLaDA-8B (masked diffusion, T=1024 steps):
+  Per step: full attention [L, L] = [1280, 1280]
+  Per step ops: O(L² · d) = O(1280² · 128) = 209M FLOPs/head
+  Total for 1024 steps: 1024 × 209M × 32 heads ≈ 6.8T FLOPs
+
+Ratio: 6.8T / 5.3B ≈ 1,280× more compute</div>
+    <div class="callout o" style="margin-top:12px;">Even with T=100 steps (lower quality), LLaDA is still ~128× more compute-intensive than LLaMA with KV cache. This is the gap that acceleration papers try to close.</div>
+  </div>
+
+  <h3>The three sources of slowness</h3>
+  <table>
+    <thead><tr><th>Problem</th><th>Root Cause</th><th>What's needed</th></tr></thead>
+    <tbody>
+      <tr><td>No KV cache</td><td>Bidirectional attention — any token change invalidates all outputs</td><td>Approximate caching (Fast-dLLM / dKV-Cache)</td></tr>
+      <tr><td>Many steps</td><td>Quality requires small k (few tokens per step), so many steps needed</td><td>Confidence-aware parallel decoding</td></tr>
+      <tr><td>O(L²) attention</td><td>Full attention over all tokens every step — no structural sparsity</td><td>Column-sparse kernels (the research proposal)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout g">
+    <strong>This is why the reading order matters:</strong><br>
+    LLaDA (this paper) → establishes the quality baseline and the bottleneck.<br>
+    dKV-Cache → approximate caching to fix problem 1.<br>
+    Fast-dLLM → caching + parallel decoding to fix problems 1 and 2.<br>
+    The research proposal → custom GPU kernels to fix problem 3: making the O(L²) step itself faster at the hardware level.
+  </div>
+
+  <h3>What makes LLaDA uniquely hard to accelerate</h3>
+  <div class="card pa">
+    <div class="eq">Image DiT (Chipmunk's target):
+  - Fixed sequence length (all patches known at start)
+  - Continuous noise → gradual change between steps
+  - Active set (fast-changing K/V) is spatially coherent (voxels)
+  - Sparsity pattern is stable for 5–10 steps
+
+LLaDA:
+  - Fixed sequence length ✓ (same)
+  - Discrete masking → token goes 0→1 abruptly (not gradual)
+  - Active set = recently unmasked tokens (suddenly non-[MASK])
+  - Active set changes every step as new tokens are revealed
+  - No spatial structure — token positions are arbitrary
+
+→ Chipmunk's exact algorithm doesn't transfer directly.
+→ Need to adapt: magnitude-based active set, re-anchor scheduling,
+  and handle the discrete (not continuous) noise process.</div>
+  </div>
+</div>
+</section>
+
+
+<div style="text-align:center;padding:32px;color:var(--muted);font-size:0.82rem;border-top:1px solid var(--border);">
+  Based on: Nie, Zhu, You et al. "Large Language Diffusion Models." arXiv:2502.09992, 2025.<br>
+  <span style="color:var(--border);">Read next: dKV-Cache (arXiv:2505.15781) → then Fast-dLLM (arXiv:2505.22618)</span>
+</div>
+
+</body>
+</html>
