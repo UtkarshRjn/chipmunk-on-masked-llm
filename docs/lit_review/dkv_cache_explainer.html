@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dKV-Cache: KV-Cache for Diffusion Language Models — Explained</title>
+<style>
+  :root {
+    --bg: #0f1117; --bg2: #181c27; --bg3: #1e2333; --border: #2a3050;
+    --text: #e2e8f0; --muted: #8892aa;
+    --green: #4ade80; --orange: #fb923c; --blue: #60a5fa;
+    --purple: #a78bfa; --yellow: #facc15; --red: #f87171; --pink: #f472b6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.7; font-size: 16px; }
+
+  .hero { background: linear-gradient(135deg, #0f1117 0%, #0f1f30 50%, #0f1117 100%); border-bottom: 1px solid var(--border); padding: 56px 40px 48px; text-align: center; }
+  .hero h1 { font-size: 2.5rem; font-weight: 800; background: linear-gradient(90deg, #60a5fa, #4ade80, #facc15); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 14px; }
+  .hero .sub { color: var(--muted); font-size: 1.05rem; max-width: 680px; margin: 0 auto 20px; }
+  .pill-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .pill { background: var(--bg3); border: 1px solid var(--border); border-radius: 999px; padding: 4px 14px; font-size: 0.82rem; color: var(--muted); }
+  .pill.hl { border-color: var(--green); color: var(--green); }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  section { padding: 60px 0; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; color: #f1f5f9; }
+  h3 { font-size: 1.1rem; font-weight: 600; margin: 24px 0 10px; color: var(--blue); }
+  p { color: #cbd5e1; margin-bottom: 12px; }
+  .sl { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--purple); margin-bottom: 6px; }
+
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin: 18px 0; }
+  .card.ga { border-left: 3px solid var(--green); }
+  .card.oa { border-left: 3px solid var(--orange); }
+  .card.ba { border-left: 3px solid var(--blue); }
+  .card.pa { border-left: 3px solid var(--purple); }
+  .card.ya { border-left: 3px solid var(--yellow); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 0; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+
+  .callout { background: #172032; border: 1px solid #2563eb44; border-left: 3px solid var(--blue); border-radius: 8px; padding: 14px 18px; margin: 16px 0; font-size: 0.92rem; color: #93c5fd; }
+  .callout.o { background: #1f1508; border-color: #f9731644; border-left-color: var(--orange); color: #fdba74; }
+  .callout.g { background: #0a1f14; border-color: #22c55e44; border-left-color: var(--green); color: #86efac; }
+  .callout.y { background: #1f1a08; border-color: #facc1544; border-left-color: var(--yellow); color: #fde68a; }
+
+  pre { background: #0d1117; border: 1px solid var(--border); border-radius: 10px; padding: 18px; font-size: 0.82rem; overflow-x: auto; color: #e2e8f0; line-height: 1.6; margin: 14px 0; }
+  .kw { color: #a78bfa; } .fn { color: #60a5fa; } .cm { color: #6b7280; } .num { color: #fb923c; } .st { color: #4ade80; }
+
+  .eq { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; font-family: 'Courier New', monospace; font-size: 0.87rem; color: var(--yellow); margin: 10px 0; overflow-x: auto; white-space: pre; }
+
+  .stat-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 18px 0; }
+  .stat { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; text-align: center; min-width: 120px; }
+  .stat .nb { font-size: 1.9rem; font-weight: 800; display: block; line-height: 1; margin-bottom: 4px; }
+  .stat .lb { font-size: 0.76rem; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 0.87rem; }
+  th { background: var(--bg3); border: 1px solid var(--border); padding: 10px 12px; text-align: left; color: var(--muted); font-weight: 600; }
+  td { border: 1px solid var(--border); padding: 10px 12px; color: var(--text); }
+  tr:nth-child(even) td { background: var(--bg2); }
+  .tg { color: var(--green); font-weight: 700; }
+  .ty { color: var(--yellow); }
+  .tr { color: var(--red); }
+
+  .toc { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin: 28px 0 0; }
+  .toc h4 { color: var(--muted); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+  .toc a { display: block; color: #94a3b8; text-decoration: none; padding: 3px 0; font-size: 0.87rem; }
+  .toc a:hover { color: var(--blue); }
+  .toc a::before { content: '→  '; color: var(--border); }
+
+  .tok-row { display: flex; gap: 4px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  .tok { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+  .tok.m  { background: #1e1e2e; border: 1px dashed #6b7280; color: #6b7280; }
+  .tok.d  { background: #1a3a1a; border: 1px solid var(--green); color: var(--green); }
+  .tok.dc { background: #0a2a0a; border: 2px solid var(--green); color: var(--green); }
+  .tok.p  { background: #1e3a5f; border: 1px solid var(--blue); color: var(--blue); }
+  .tok.c  { background: #2d1f3a; border: 1px solid var(--purple); color: var(--purple); }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); margin: 10px 0; align-items: center; }
+  .ld { width: 12px; height: 12px; border-radius: 2px; display: inline-block; margin-right: 4px; vertical-align: middle; }
+
+  .step-row { display: flex; gap: 0; overflow-x: auto; margin: 20px 0; padding-bottom: 6px; }
+  .sbox { flex: 0 0 80px; text-align: center; position: relative; }
+  .sbox:not(:last-child)::after { content: ''; position: absolute; top: 20px; right: -8px; width: 16px; height: 2px; background: var(--border); }
+  .sc { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; margin: 0 auto 6px; }
+  .sc.f { background: #1e3a5f; border: 2px solid var(--blue); color: var(--blue); }
+  .sc.c2 { background: #1a3a1a; border: 2px solid var(--green); color: var(--green); }
+  .sc.r { background: #3a1a00; border: 2px solid var(--orange); color: var(--orange); }
+  .slb { font-size: 0.68rem; color: var(--muted); line-height: 1.4; }
+
+  .diagram-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin: 18px 0; overflow-x: auto; }
+
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 18px 0; }
+  .cg-header { padding: 10px 16px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .cg-body { padding: 14px 16px; font-size: 0.84rem; color: #cbd5e1; border-top: 1px solid var(--border); }
+  .cg-left .cg-header { background: #1e1e2e; color: var(--red); }
+  .cg-right .cg-header { background: #0a1f14; color: var(--green); }
+  .cg-left { border-right: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="container">
+    <h1>dKV-Cache</h1>
+    <p class="sub">The Cache for Diffusion Language Models — first KV-cache mechanism for DLMs, training-free, 2–10× speedup</p>
+    <div class="pill-row">
+      <span class="pill">Ma · Yu · Fang · Wang &nbsp;|&nbsp; National University of Singapore</span>
+      <span class="pill">arXiv:2505.15781 · May 2025</span>
+      <span class="pill hl">2–10× speedup · training-free · LLaDA + Dream</span>
+    </div>
+    <div class="toc">
+      <h4>Contents</h4>
+      <a href="#problem">01 — Why KV-Cache breaks in Diffusion LMs</a>
+      <a href="#observation">02 — Key Observation: Representation Dynamics</a>
+      <a href="#decode">03 — dKV-Cache-Decode: Delayed Caching (near-lossless)</a>
+      <a href="#greedy">04 — dKV-Cache-Greedy: Aggressive Caching (O(L²))</a>
+      <a href="#delay">05 — Why the One-Step Delay is Critical</a>
+      <a href="#concat">06 — concat_reorder: How it's Implemented</a>
+      <a href="#variants">07 — All Variants at a Glance</a>
+      <a href="#results">08 — Results</a>
+      <a href="#limit">09 — Limitation and the Gap this Proposal Fills</a>
+    </div>
+  </div>
+</div>
+
+
+<!-- 01 PROBLEM -->
+<section id="problem">
+<div class="container">
+  <div class="sl">01 — The Problem</div>
+  <h2>Why standard KV-Cache cannot work in DLMs</h2>
+
+  <p>In autoregressive LMs (GPT, LLaMA etc.), KV-cache is the core speedup: compute K,V for each token once, cache them, reuse forever. This makes each new token O(1) instead of O(L). But diffusion language models break both assumptions KV-cache relies on.</p>
+
+  <div class="compare-grid">
+    <div class="cg-left">
+      <div class="cg-header">AR LM — KV-cache works ✓</div>
+      <div class="cg-body">
+        <p style="font-size:0.84rem;margin-bottom:8px;"><strong>Causal (left-to-right) attention</strong></p>
+        <p style="font-size:0.84rem;margin-bottom:8px;">Token i only attends to tokens 1..i. Once token i is generated, K[i] and V[i] never change — nothing to the right can affect them.</p>
+        <p style="font-size:0.84rem;margin-bottom:8px;"><strong>Fixed sequential order</strong></p>
+        <p style="font-size:0.84rem;margin-bottom:0;">Always generates left → right. Next position is always known in advance.</p>
+      </div>
+    </div>
+    <div class="cg-right">
+      <div class="cg-header">DLM — KV-cache breaks ✗</div>
+      <div class="cg-body">
+        <p style="font-size:0.84rem;margin-bottom:8px;"><strong>Bidirectional attention</strong></p>
+        <p style="font-size:0.84rem;margin-bottom:8px;">Every token attends to every other token. When ANY token unmasks, the K,V of ALL other tokens can shift. K[i] at step t ≠ K[i] at step t+1.</p>
+        <p style="font-size:0.84rem;margin-bottom:8px;"><strong>Non-sequential decoding order</strong></p>
+        <p style="font-size:0.84rem;margin-bottom:0;">Any masked position can be chosen next based on confidence. Next position is unknown until the forward pass completes.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>The complexity cost of no cache</h3>
+  <div class="eq">AR with KV-cache:   O(L²)  total  —  O(L) per step × L steps
+DLM without cache:  O(L³)  total  —  O(L²) per step × L steps
+
+For L = 512, T = 512:
+  AR:   512² = 262k operations per step
+  DLM:  512² × 512 = 134M total  →  DLMs are ~512× more expensive</div>
+
+  <div class="stat-row">
+    <div class="stat"><span class="nb" style="color:var(--red)">O(L³)</span><span class="lb">DLM total complexity<br>without cache</span></div>
+    <div class="stat"><span class="nb" style="color:var(--green)">O(L²)</span><span class="lb">AR with KV-cache<br>total complexity</span></div>
+    <div class="stat"><span class="nb" style="color:var(--blue)">2–10×</span><span class="lb">speedup achieved<br>by dKV-Cache</span></div>
+    <div class="stat"><span class="nb" style="color:var(--purple)">~0</span><span class="lb">quality loss<br>(Decode variant)</span></div>
+  </div>
+</div>
+</section>
+
+
+<!-- 02 OBSERVATION -->
+<section id="observation">
+<div class="container">
+  <div class="sl">02 — Key Observation</div>
+  <h2>Representation Dynamics: what actually changes</h2>
+  <p>The paper investigates whether K and V can be reused despite bidirectional attention. They measure how much K and V change between consecutive denoising steps for each token.</p>
+
+  <h3>Three findings from Figure 2</h3>
+
+  <div class="card ba">
+    <h3 style="margin-top:0;color:var(--blue)">Finding 1 — K,V are highly similar across steps</h3>
+    <p style="font-size:0.85rem;">Despite step-to-step differences, K and V embeddings show <strong>consistently high cosine similarity across timesteps</strong> (pairwise similarity heatmap shows values above 0.975 for most step pairs). They change, but not dramatically.</p>
+    <div class="callout">The representations are NOT completely different each step. They drift slowly — which is what makes caching feasible at all.</div>
+  </div>
+
+  <div class="card ga">
+    <h3 style="margin-top:0;color:var(--green)">Finding 2 — Decoded tokens stabilize, masked tokens fluctuate</h3>
+    <p style="font-size:0.85rem;">Tokens split into two groups based on their state:</p>
+
+    <div style="margin:14px 0;">
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:8px;">Step progression (left = early, right = late):</div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px;">Step t=1 (early — mostly masked)</div>
+        <div class="tok-row">
+          <div class="tok m">[M]</div><div class="tok m">[M]</div><div class="tok m">[M]</div>
+          <div class="tok m">[M]</div><div class="tok m">[M]</div><div class="tok m">[M]</div>
+          <div class="tok m">[M]</div><div class="tok m">[M]</div><div class="tok m">[M]</div>
+          <div class="tok m">[M]</div>
+          <span style="font-size:0.75rem;color:var(--red);margin-left:8px;">all K,V fluctuating</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px;">Step t=5 (some decoded)</div>
+        <div class="tok-row">
+          <div class="tok d">the</div><div class="tok d">cat</div><div class="tok m">[M]</div>
+          <div class="tok d">on</div><div class="tok m">[M]</div><div class="tok m">[M]</div>
+          <div class="tok d">mat</div><div class="tok m">[M]</div><div class="tok m">[M]</div>
+          <div class="tok m">[M]</div>
+          <span style="font-size:0.75rem;color:var(--muted);margin-left:8px;">decoded tokens: stable K,V</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px;">Step t=9 (mostly decoded)</div>
+        <div class="tok-row">
+          <div class="tok dc">the</div><div class="tok dc">cat</div><div class="tok dc">sat</div>
+          <div class="tok dc">on</div><div class="tok dc">the</div><div class="tok dc">old</div>
+          <div class="tok dc">red</div><div class="tok dc">mat</div><div class="tok m">[M]</div>
+          <div class="tok m">[M]</div>
+          <span style="font-size:0.75rem;color:var(--green);margin-left:8px;">most K,V stable → cacheable!</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><span class="ld" style="background:#1e1e2e;border:1px dashed #6b7280;"></span>[MASK] — still masked, K,V fluctuating</span>
+      <span><span class="ld" style="background:#1a3a1a;border:1px solid var(--green);"></span>Decoded — K,V stabilized</span>
+    </div>
+  </div>
+
+  <div class="card oa">
+    <h3 style="margin-top:0;color:var(--orange)">Finding 3 — Largest change happens AT the decoding step</h3>
+    <p style="font-size:0.85rem;">For each token, the step where it transitions from [MASK] → decoded is the step with the <strong>maximum K,V change</strong>. Before that step: fluctuating. After that step: stable.</p>
+    <div class="eq">||dK/dt|| is maximum at the exact step token transitions MASK → decoded
+
+Before decode:  K,V change a lot each step
+At decode:      K,V change MOST (biggest jump)
+After decode:   K,V barely change  ← safe to cache</div>
+    <div class="callout o">This is the empirical foundation everything builds on. If you cache K,V immediately at the decoding step, you capture a bad (maximally-changing) value. Wait one more step → K,V has settled → safe to cache. This motivates the ONE-STEP DELAY.</div>
+  </div>
+</div>
+</section>
+
+
+<!-- 03 DECODE -->
+<section id="decode">
+<div class="container">
+  <div class="sl">03 — dKV-Cache-Decode</div>
+  <h2>Delayed Caching — near-lossless variant</h2>
+
+  <p>The core idea: only cache K,V for tokens that have been decoded. But with a one-step delay — wait one extra step after decoding before caching, because the decoding step itself has the largest K,V change.</p>
+
+  <h3>The caching rule</h3>
+  <div class="eq">At step t:
+  Mt      = set of currently MASKED tokens
+  Mt-1    = set of masked tokens from PREVIOUS step
+  I \ Mt  = all decoded tokens
+  I \ Mt-1 = decoded tokens from previous step (one-step delayed)
+
+CACHE:   K,V for tokens in  I \ Mt-1  (decoded last step, now stable)
+COMPUTE: K,V for tokens in  Mt-1      (still masked last step, may change)
+
+Attention formula:
+  z_t = softmax( Q^{Mt-1}_t  @  K^I_t^T )  @  V^I_t
+
+  where K^I_t = concat_reorder( K^{I\Mt-1}_{t-1},  K^{Mt-1}_t )
+                                 ↑ from cache         ↑ freshly computed</div>
+
+  <h3>Step-by-step walkthrough</h3>
+
+  <div class="step-row">
+    <div class="sbox"><div class="sc f">t=1</div><div class="slb">All masked<br>Compute all<br>K,V</div></div>
+    <div class="sbox"><div class="sc c2">t=2</div><div class="slb">3 decoded<br>Cache K,V<br>from t=1</div></div>
+    <div class="sbox"><div class="sc c2">t=3</div><div class="slb">5 decoded<br>Cache more<br>from t=2</div></div>
+    <div class="sbox"><div class="sc r">t=R</div><div class="slb">Refresh<br>step — full<br>recompute</div></div>
+    <div class="sbox"><div class="sc c2">t=R+1</div><div class="slb">Cache<br>from t=R<br>again</div></div>
+    <div class="sbox" style="opacity:0.5"><div class="sc c2">...</div><div class="slb">continue</div></div>
+  </div>
+
+  <div class="legend" style="margin-bottom:16px;">
+    <span><span class="ld" style="background:#1e3a5f;border:1px solid var(--blue);"></span>Full compute step</span>
+    <span><span class="ld" style="background:#1a3a1a;border:1px solid var(--green);"></span>Cache reuse step</span>
+    <span><span class="ld" style="background:#3a1a00;border:1px solid var(--orange);"></span>Refresh step</span>
+  </div>
+
+  <h3>Cache Refreshing</h3>
+  <div class="card ya">
+    <p style="font-size:0.85rem;">Even decoded tokens can slowly drift if the sequence context keeps changing around them. Without refreshing, error accumulates over many steps.</p>
+    <p style="font-size:0.85rem;margin-bottom:0;">Every <strong>N steps</strong>, discard all cached K,V and recompute everything from scratch. This resets any accumulated drift to zero. Typical setting: refresh every 4–8 steps.</p>
+    <div class="callout y" style="margin-top:12px;">Analogy: like Chipmunk's dense anchor step. Every N steps = full recompute to reset error. Between refreshes = use cached values.</div>
+  </div>
+
+  <h3>Pseudocode</h3>
+  <pre><span class="kw">def</span> <span class="fn">dkv_cache_decode_step</span>(x, t, Mt, Mt_prev, K_cache, V_cache, refresh_every=<span class="num">8</span>):
+    <span class="cm"># Mt      = masked tokens at step t</span>
+    <span class="cm"># Mt_prev = masked tokens at step t-1 (one-step delay)</span>
+
+    <span class="kw">if</span> t % refresh_every == <span class="num">0</span>:
+        <span class="cm"># Full refresh — recompute everything</span>
+        Q, K, V = <span class="fn">compute_qkv</span>(x, all_positions)
+        K_cache = K[I \ Mt]   <span class="cm"># cache decoded tokens</span>
+        V_cache = V[I \ Mt]
+    <span class="kw">else</span>:
+        <span class="cm"># Sparse step — only compute for masked tokens</span>
+        Q_masked = <span class="fn">compute_q</span>(x, Mt_prev)    <span class="cm"># Q only for still-masked</span>
+        K_new, V_new = <span class="fn">compute_kv</span>(x, Mt_prev)  <span class="cm"># K,V for masked (may change)</span>
+
+        <span class="cm"># Full K,V = cached (decoded tokens) + fresh (masked tokens)</span>
+        K_full = <span class="fn">concat_reorder</span>(K_cache, K_new)
+        V_full = <span class="fn">concat_reorder</span>(V_cache, V_new)
+
+        <span class="cm"># Attention: masked queries attend to ALL keys</span>
+        output = <span class="fn">attention</span>(Q_masked, K_full, V_full)
+
+        <span class="cm"># Update cache with newly-stable tokens (one-step delayed)</span>
+        newly_stable = Mt_prev \ Mt   <span class="cm"># tokens decoded THIS step</span>
+        K_cache[newly_stable] = K_new[newly_stable]
+        V_cache[newly_stable] = V_new[newly_stable]
+
+    <span class="kw">return</span> output, K_cache, V_cache</pre>
+</div>
+</section>
+
+
+<!-- 04 GREEDY -->
+<section id="greedy">
+<div class="container">
+  <div class="sl">04 — dKV-Cache-Greedy</div>
+  <h2>Aggressive Caching — reduces O(L³) to O(L²)</h2>
+
+  <p>dKV-Cache-Decode still has O(L³) complexity because the set of masked tokens |Mt| starts at L and only shrinks by ~1 each step — you still compute Q for nearly all tokens at early steps.</p>
+
+  <p>dKV-Cache-Greedy fixes this by making |Mt| a <strong>fixed small size</strong> at every step, regardless of where we are in the denoising process.</p>
+
+  <h3>What Mt contains in Greedy mode</h3>
+  <div class="eq">Mt = { Dt }          the token being decoded at THIS step
+     ∪ { D(t-1) }       the token decoded LAST step (one-step delay rule)
+     ∪ { W(t) }         a local window of neighbors around Dt (size ≤ 6)
+
+|Mt| = 1 + 1 + w = small constant  (e.g., w=4 → |Mt| = 6)
+→ per-step cost: O(|Mt| × L) ≈ O(6L) = O(L)
+→ total: O(L × L) = O(L²)   ← same as AR!</div>
+
+  <div class="two-col">
+    <div class="card oa">
+      <h3 style="margin-top:0;color:var(--orange)">Why include Dt</h3>
+      <p style="font-size:0.85rem;">The token being decoded right now has the largest K,V change — it just transitioned from MASK. Must be in the active set.</p>
+    </div>
+    <div class="card pa">
+      <h3 style="margin-top:0;color:var(--purple)">Why include W(t)</h3>
+      <p style="font-size:0.85rem;">Tokens neighboring the current decode position are likely attending to it heavily. Including a small window dramatically improves accuracy with minimal extra cost.</p>
+    </div>
+  </div>
+
+  <h3>Complexity comparison</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Per-step cost</th><th>Total complexity</th><th>Quality</th></tr></thead>
+    <tbody>
+      <tr><td>Full DLM (no cache)</td><td>O(L²)</td><td class="tr">O(L³)</td><td class="tg">Perfect</td></tr>
+      <tr><td>dKV-Cache-Decode</td><td>O(|Mt| × L) decreasing</td><td class="ty">O(L³) but faster constant</td><td class="tg">Near-lossless</td></tr>
+      <tr><td>dKV-Cache-Greedy</td><td>O(|Mt| × L) fixed small</td><td class="tg">O(L²)</td><td class="ty">Some degradation</td></tr>
+      <tr><td>AR with KV-cache</td><td>O(L)</td><td class="tg">O(L²)</td><td class="tg">Perfect</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout o">Trade-off: Greedy achieves the same complexity as AR (O(L²)) but at the cost of some accuracy, because many decoded tokens get stale K,V between refreshes. The window size and refresh interval control this tradeoff.</div>
+</div>
+</section>
+
+
+<!-- 05 DELAY -->
+<section id="delay">
+<div class="container">
+  <div class="sl">05 — The One-Step Delay</div>
+  <h2>Why the delay is critical — not optional</h2>
+  <p>This is the single most important design decision. Without the one-step delay, the method fails catastrophically at high cache ratios.</p>
+
+  <div class="two-col">
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--red)">Without delay — cache immediately</h3>
+      <p style="font-size:0.85rem;">At step t, token X decodes. Immediately cache K[X], V[X] from step t and reuse forever.</p>
+      <p style="font-size:0.85rem;">Problem: step t is the <strong>maximum change step</strong> for token X. K[X] at step t is very different from K[X] at step t+1 (which is the stable value). Caching the unstable value poisons the cache.</p>
+      <div class="callout o" style="margin-top:8px;">
+        Result from Figure 3: performance collapses to near-zero accuracy as cache ratio increases. The stale K,V values actively mislead attention.
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--green)">With one-step delay — cache next step</h3>
+      <p style="font-size:0.85rem;">At step t, token X decodes. Do NOT cache yet. At step t+1, K[X] has settled to its stable value. Now cache K[X] from step t+1.</p>
+      <p style="font-size:0.85rem;">The one-step delay lets the representation land at its stable value before we lock it in the cache.</p>
+      <div class="callout g" style="margin-top:8px;">
+        Result from Figure 3: performance stays near-perfect even at high cache ratios. The delay makes the cache content reliable.
+      </div>
+    </div>
+  </div>
+
+  <h3>What "one-step delay" means in the algorithm</h3>
+  <div class="eq">Normal caching (no delay):
+  At step t: X just decoded → cache K[X]_t immediately
+
+One-step delayed caching:
+  At step t:   X just decoded → don't cache yet, still compute K[X]
+  At step t+1: X is now in I\Mt-1 → NOW cache K[X]_{t+1}
+
+The index set for what's cacheable at step t:
+  No delay:    I \ Mt      (everything decoded BY step t)
+  One-step:    I \ Mt-1    (everything decoded BY step t-1)
+
+Difference: the tokens decoded at exactly step t are excluded
+            from the cache for one more step.</div>
+
+  <div class="callout">In code: instead of checking <code>if token in decoded_this_step</code>, you check <code>if token in decoded_last_step</code>. One line change. Massive impact on accuracy.</div>
+</div>
+</section>
+
+
+<!-- 06 CONCAT REORDER -->
+<section id="concat">
+<div class="container">
+  <div class="sl">06 — concat_reorder</div>
+  <h2>How it's implemented efficiently</h2>
+
+  <p>The algorithm needs to: (1) gather cached K,V from arbitrary positions, (2) concatenate with fresh K,V, (3) run attention, (4) scatter results back to original positions. Doing this naively with random indexing is slow.</p>
+
+  <h3>The naive problem</h3>
+  <div class="card oa">
+    <p style="font-size:0.85rem;">AR KV-cache just appends: <code>[K_cached ; K_new]</code> — simple contiguous memory, fast.</p>
+    <p style="font-size:0.85rem;">dKV-Cache needs to gather scattered positions: decoded tokens are at positions [2,4,5,7...] in the original sequence — not contiguous. Gathering these requires indexing, which generates non-contiguous memory accesses → slow.</p>
+    <p style="font-size:0.85rem;margin-bottom:0;">Additionally, after attention, results must be scattered back to original positions. Two expensive indexing operations per step.</p>
+  </div>
+
+  <h3>The concat_reorder solution</h3>
+  <div class="card ga">
+    <p style="font-size:0.85rem;"><strong>Key idea:</strong> reorder the token sequence at the START of each forward pass so that cached tokens (decoded, I\Mt-1) are on the LEFT and uncached tokens (masked, Mt-1) are on the RIGHT. This makes concatenation contiguous.</p>
+
+    <div class="eq">Example: 8 tokens, decoded at t-1: {2, 4, 5}
+
+Original order:  [0, 1, 2, 3, 4, 5, 6, 7]
+Reordered:       [2, 4, 5 | 0, 1, 3, 6, 7]
+                  ↑cached  ↑uncached (masked)
+
+Now:
+  K_cached is contiguous at left of K matrix
+  K_fresh  is contiguous at right of K matrix
+  concat = just K matrix as-is, no gather needed!
+
+At next step, if token 7 also decodes:
+Reorder: [2, 4, 5, 7 | 0, 1, 3, 6]
+→ just move token 7 from right to left side</div>
+
+    <p style="font-size:0.85rem;">Positional embeddings (RoPE) are also reordered — this is cheap since it happens once per layer, shared across all heads.</p>
+  </div>
+
+  <h3>The reorder operation</h3>
+  <pre><span class="cm"># At each step, compute a permutation index to reorder tokens</span>
+<span class="cm"># Cached tokens (decoded) go left, uncached (masked) go right</span>
+
+<span class="kw">def</span> <span class="fn">concat_reorder</span>(K_cached, K_fresh, decoded_positions, masked_positions):
+    <span class="cm"># Reorder positional embeddings once</span>
+    PE_reordered = PE[decoded_positions + masked_positions]
+
+    <span class="cm"># After computing Q,K,V for the reordered sequence:</span>
+    <span class="cm"># K matrix is already [K_decoded | K_masked] — just concatenate</span>
+    K_full = <span class="fn">concat</span>(K_cached, K_fresh)   <span class="cm"># contiguous — fast</span>
+
+    <span class="cm"># For next step: compute new reorder mapping</span>
+    <span class="cm"># (adds any newly decoded tokens to the left side)</span>
+    new_decoded = decoded_positions + newly_decoded_this_step
+    new_masked  = masked_positions - newly_decoded_this_step
+    reorder_idx = <span class="fn">compute_permutation</span>(new_decoded, new_masked)
+
+    <span class="cm"># Reorder K,V for caching at next step</span>
+    K_cache_next = K_full[reorder_idx[:len(new_decoded)]]
+    <span class="kw">return</span> K_full, K_cache_next</pre>
+
+  <div class="callout">This is the operator dKV-Cache authors say has "substantial potential for further optimization" — specifically, this is what Chipmunk's <code>cp.async</code> gather kernel would replace for the hardware-accelerated version.</div>
+</div>
+</section>
+
+
+<!-- 07 VARIANTS -->
+<section id="variants">
+<div class="container">
+  <div class="sl">07 — All Variants</div>
+  <h2>The full family of dKV-Cache methods</h2>
+
+  <table>
+    <thead><tr><th>Variant</th><th>What's cached</th><th>Refresh</th><th>Complexity</th><th>Quality</th><th>Best for</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>dKV-Cache-Decode</strong></td>
+        <td>All decoded tokens (I\Mt-1)</td>
+        <td>Every N steps</td>
+        <td class="ty">O(L³) but faster</td>
+        <td class="tg">Near-lossless</td>
+        <td>Quality-sensitive tasks</td>
+      </tr>
+      <tr>
+        <td><strong>dKV-Cache-Greedy</strong></td>
+        <td>Only Dt ∪ D(t-1) ∪ window</td>
+        <td>Every 2 steps</td>
+        <td class="tg">O(L²)</td>
+        <td class="ty">Some degradation</td>
+        <td>Maximum speed</td>
+      </tr>
+      <tr>
+        <td><strong>dKV-Cache-Prefill</strong></td>
+        <td>Prefill (prompt) tokens — never refreshed</td>
+        <td>Never (prefill)</td>
+        <td class="tg">O(L²) for prefill</td>
+        <td class="tg">Near-lossless</td>
+        <td>Long prompt tasks (MMLU, GPQA)</td>
+      </tr>
+      <tr>
+        <td><strong>dKV-Cache-PD</strong></td>
+        <td>Prefill tokens (no refresh) + decoded tokens (periodic refresh)</td>
+        <td>Decoded only</td>
+        <td class="tg">O(L²)</td>
+        <td class="tg">Strong</td>
+        <td>Long prompt + long generation</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>When to use which</h3>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 780 200" width="100%" style="max-width:780px;display:block;margin:0 auto;">
+      <text x="390" y="18" fill="#f1f5f9" font-size="11" font-weight="700" text-anchor="middle">Decision tree: which variant?</text>
+
+      <!-- Root question -->
+      <rect x="270" y="28" width="240" height="36" rx="6" fill="#181c27" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="390" y="50" fill="#60a5fa" font-size="9" text-anchor="middle" font-weight="700">Is long prompt (prefill) a bottleneck?</text>
+
+      <!-- Left branch: No -->
+      <line x1="310" y1="64" x2="180" y2="100" stroke="#374151" stroke-width="1.5"/>
+      <text x="230" y="88" fill="#6b7280" font-size="8" text-anchor="middle">No</text>
+
+      <!-- Right branch: Yes -->
+      <line x1="470" y1="64" x2="600" y2="100" stroke="#374151" stroke-width="1.5"/>
+      <text x="550" y="88" fill="#6b7280" font-size="8" text-anchor="middle">Yes</text>
+
+      <!-- Left sub-question -->
+      <rect x="80" y="100" width="200" height="36" rx="6" fill="#181c27" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="180" y="118" fill="#a78bfa" font-size="9" text-anchor="middle" font-weight="700">Need near-lossless quality?</text>
+
+      <!-- Right sub-question -->
+      <rect x="500" y="100" width="200" height="36" rx="6" fill="#181c27" stroke="#4ade80" stroke-width="1.5"/>
+      <text x="600" y="118" fill="#4ade80" font-size="9" text-anchor="middle" font-weight="700">Also need fast generation?</text>
+
+      <!-- Left Yes -->
+      <line x1="130" y1="136" x2="90" y2="165" stroke="#374151" stroke-width="1.5"/>
+      <text x="100" y="158" fill="#6b7280" font-size="8">Yes</text>
+      <rect x="10" y="165" width="160" height="28" rx="5" fill="#0a1f14" stroke="#4ade80" stroke-width="1.5"/>
+      <text x="90" y="183" fill="#4ade80" font-size="9" text-anchor="middle" font-weight="700">dKV-Cache-Decode</text>
+
+      <!-- Left No -->
+      <line x1="230" y1="136" x2="265" y2="165" stroke="#374151" stroke-width="1.5"/>
+      <text x="260" y="158" fill="#6b7280" font-size="8">No</text>
+      <rect x="185" y="165" width="160" height="28" rx="5" fill="#1f1508" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="265" y="183" fill="#fb923c" font-size="9" text-anchor="middle" font-weight="700">dKV-Cache-Greedy</text>
+
+      <!-- Right No -->
+      <line x1="550" y1="136" x2="510" y2="165" stroke="#374151" stroke-width="1.5"/>
+      <text x="515" y="158" fill="#6b7280" font-size="8">No</text>
+      <rect x="430" y="165" width="160" height="28" rx="5" fill="#0f1f2e" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="510" y="183" fill="#60a5fa" font-size="9" text-anchor="middle" font-weight="700">dKV-Cache-Prefill</text>
+
+      <!-- Right Yes -->
+      <line x1="650" y1="136" x2="690" y2="165" stroke="#374151" stroke-width="1.5"/>
+      <text x="680" y="158" fill="#6b7280" font-size="8">Yes</text>
+      <rect x="610" y="165" width="160" height="28" rx="5" fill="#1a1040" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="690" y="183" fill="#a78bfa" font-size="9" text-anchor="middle" font-weight="700">dKV-Cache-PD</text>
+    </svg>
+  </div>
+</div>
+</section>
+
+
+<!-- 08 RESULTS -->
+<section id="results">
+<div class="container">
+  <div class="sl">08 — Results</div>
+  <h2>Benchmarks and speedups</h2>
+
+  <h3>LLaDA-8B-Instruct — zero-shot (A6000)</h3>
+  <table>
+    <thead><tr><th>Benchmark</th><th>Base (full)</th><th>Half-Steps baseline</th><th>dKV-Cache-Greedy</th><th>dKV-Cache-Decode</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>MMLU</td>
+        <td>51.79 (30 tok/s)</td>
+        <td>43.19 (47 tok/s 1.67×)</td>
+        <td class="ty">45.77 (51 tok/s 1.68×)</td>
+        <td class="tg">51.11 (56 tok/s <strong>1.97×</strong>)</td>
+      </tr>
+      <tr>
+        <td>GSM8K</td>
+        <td>72.25 (15 tok/s)</td>
+        <td>65.58 (24 tok/s 1.59×)</td>
+        <td class="ty">67.93 (25 tok/s 1.68×)</td>
+        <td class="tg">77.56 (29 tok/s <strong>2.00×</strong>)</td>
+      </tr>
+      <tr>
+        <td>HumanEval</td>
+        <td>19.88 (7.5 tok/s)</td>
+        <td>15.61 (12.5 tok/s 1.67×)</td>
+        <td class="ty">15.13 (12.3 tok/s 1.64×)</td>
+        <td class="tg">39.63 (14.2 tok/s <strong>2.00×</strong>)</td>
+      </tr>
+      <tr>
+        <td>MBPP</td>
+        <td>21.4 (7.5 tok/s)</td>
+        <td>15.6 (13.0 tok/s 1.73×)</td>
+        <td class="ty">17.8 (12.6 tok/s 1.67×)</td>
+        <td class="tg">40.4 (15.0 tok/s <strong>2.00×</strong>)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout g">Remarkable: dKV-Cache-Decode on HumanEval improves accuracy from 19.88% → 39.63% while also being 2× faster. The authors hypothesize DLMs under-utilize contextual information with full bidirectional attention — caching forces the model to use context more efficiently.</div>
+
+  <h3>Dream-7B — long prefill settings (H20)</h3>
+  <table>
+    <thead><tr><th>Task</th><th>Steps</th><th>Base</th><th>dKV-Cache-Decode</th><th>dKV-Cache-Prefill</th></tr></thead>
+    <tbody>
+      <tr><td>GPQA (L=128)</td><td>T=128</td><td>36.83 (7.4 tok/s)</td><td class="ty">35.71 (18.2 tok/s 2.46×)</td><td class="tg">35.27 (75.4 tok/s <strong>10.19×</strong>)</td></tr>
+      <tr><td>GPQA (L=128)</td><td>T=64</td><td>35.49 (14.7 tok/s)</td><td class="ty">34.15 (36.8 tok/s 4.97×)</td><td class="tg">35.27 (139.9 tok/s <strong>18.91×</strong>)</td></tr>
+      <tr><td>GSM8K (L=256)</td><td>T=128</td><td>68.81 (30.3 tok/s)</td><td class="tg">65.35 (62.3 tok/s <strong>4.13×</strong>)</td><td class="tg">65.96 (107.4 tok/s 7.11×)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">dKV-Cache-Prefill achieves up to <strong>18.91× speedup</strong> on long-prefill tasks with near-zero quality loss. This is because prefill tokens (few-shot examples) are computed once and cached permanently — every denoising step skips re-encoding the entire long prompt.</div>
+
+  <h3>Key analytical findings</h3>
+  <div class="two-col">
+    <div class="card ga">
+      <h3 style="margin-top:0;color:var(--green)">More steps → bigger gain</h3>
+      <p style="font-size:0.85rem;">As the number of denoising steps T increases, dKV-Cache's advantage over the baseline grows. At T=512, GSM8K improves from 80.97% → 83.13% accuracy while being faster. More steps = more opportunities for cache reuse.</p>
+    </div>
+    <div class="card pa">
+      <h3 style="margin-top:0;color:var(--purple)">Batch size matters for speed</h3>
+      <p style="font-size:0.85rem;">At batch size 1, dKV-Cache can actually be SLOWER than baseline because gather/scatter operations generate non-contiguous memory accesses that are inefficient. Larger batch sizes (8+) deliver the full speedup reliably.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- 09 LIMITATION -->
+<section id="limit" style="border-bottom:none;">
+<div class="container">
+  <div class="sl">09 — Limitation and the Research Gap</div>
+  <h2>What dKV-Cache explicitly leaves open</h2>
+
+  <div class="card oa">
+    <h3 style="margin-top:0;color:var(--orange)">Verbatim from §5 Conclusions</h3>
+    <p style="font-style:italic;color:#fdba74;font-size:0.92rem;">"One primary limitation of this work lies in its focus on algorithmic design in isolation. While our proposed method introduces an effective caching mechanism from a purely algorithmic perspective, diffusion language models also exhibit substantial room for improvement at the system level. We believe that future research integrating algorithmic innovations with system-level optimization, such as memory management, parallelism, and hardware-aware execution, could unlock further efficiency gains and performance improvements for DLMs."</p>
+  </div>
+
+  <h3>What this means concretely</h3>
+  <div class="two-col">
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--red)">What dKV-Cache did NOT do</h3>
+      <ul style="color:#cbd5e1;padding-left:18px;font-size:0.85rem;">
+        <li>Tested on A6000 and H20 — not H100/Hopper</li>
+        <li>No <code>cp.async</code> scattered gather from HBM</li>
+        <li>No wgmma tensor-core optimization</li>
+        <li>No warp specialization for cache I/O</li>
+        <li>concat_reorder is PyTorch-level — not kernel-level</li>
+        <li>No formal error bound on approximation quality</li>
+        <li>Selection criterion: recency (decode order), not magnitude</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--green)">What the research proposal adds</h3>
+      <ul style="color:#cbd5e1;padding-left:18px;font-size:0.85rem;">
+        <li>Hopper-native kernel: cp.async + TMA + wgmma</li>
+        <li>Magnitude-based active set (Chipmunk's approach)</li>
+        <li>Warp specialization for cache reads/writes</li>
+        <li>Formal error bound (first in MDM literature)</li>
+        <li>H100 characterization (nobody has done this)</li>
+        <li>Composition with FastDLLM + speculative decoding</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>How dKV-Cache and Chipmunk relate to the proposal</h3>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 780 130" width="100%" style="max-width:780px;display:block;margin:0 auto;">
+      <defs>
+        <marker id="a" markerWidth="8" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <path d="M0,0 L0,7 L8,3.5 z" fill="#4b5563"/>
+        </marker>
+      </defs>
+
+      <!-- dKV-Cache box -->
+      <rect x="10" y="30" width="200" height="70" rx="8" fill="#0f1a2e" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="110" y="55" fill="#60a5fa" font-size="10" text-anchor="middle" font-weight="700">dKV-Cache (this paper)</text>
+      <text x="110" y="70" fill="#94a3b8" font-size="8" text-anchor="middle">Algorithm: WHAT to cache</text>
+      <text x="110" y="82" fill="#94a3b8" font-size="8" text-anchor="middle">(recency-based, PyTorch ops)</text>
+      <text x="110" y="94" fill="#94a3b8" font-size="8" text-anchor="middle">A6000 / H20</text>
+
+      <!-- plus -->
+      <text x="240" y="73" fill="#6b7280" font-size="20" text-anchor="middle">+</text>
+
+      <!-- Chipmunk box -->
+      <rect x="270" y="30" width="200" height="70" rx="8" fill="#1a0f2e" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="370" y="55" fill="#a78bfa" font-size="10" text-anchor="middle" font-weight="700">Chipmunk (image DiTs)</text>
+      <text x="370" y="70" fill="#94a3b8" font-size="8" text-anchor="middle">Kernel: HOW to gather fast</text>
+      <text x="370" y="82" fill="#94a3b8" font-size="8" text-anchor="middle">(cp.async + wgmma + warp-spec)</text>
+      <text x="370" y="94" fill="#94a3b8" font-size="8" text-anchor="middle">H100-SXM5</text>
+
+      <!-- equals -->
+      <text x="500" y="73" fill="#6b7280" font-size="20" text-anchor="middle">=</text>
+
+      <!-- Proposal box -->
+      <rect x="530" y="20" width="240" height="90" rx="8" fill="#0a1f14" stroke="#4ade80" stroke-width="2"/>
+      <text x="650" y="45" fill="#4ade80" font-size="10" text-anchor="middle" font-weight="700">Research Proposal</text>
+      <text x="650" y="60" fill="#94a3b8" font-size="8" text-anchor="middle">dKV-Cache algorithm adapted for MDMs</text>
+      <text x="650" y="72" fill="#94a3b8" font-size="8" text-anchor="middle">+ Chipmunk kernel on H100 (magnitude top-k)</text>
+      <text x="650" y="84" fill="#94a3b8" font-size="8" text-anchor="middle">+ Formal error bound</text>
+      <text x="650" y="96" fill="#4ade80" font-size="8" text-anchor="middle">= first hardware-aware MDM acceleration</text>
+    </svg>
+  </div>
+
+  <div class="callout g" style="margin-top:24px;">
+    <strong>Summary:</strong> dKV-Cache proves empirically that K,V can be reused in diffusion language models and gives the algorithmic framework for how to do it. The research proposal takes that framework and asks: what if we also added Chipmunk's kernel-level machinery (cp.async gather, wgmma, warp specialization) AND replaced recency-based selection with magnitude-based selection? That's the missing piece dKV-Cache's authors explicitly called for.
+  </div>
+</div>
+</section>
+
+<div style="text-align:center;padding:28px;color:var(--muted);font-size:0.8rem;border-top:1px solid var(--border);">
+  Based on: Ma, Yu, Fang, Wang. "dKV-Cache: The Cache for Diffusion Language Models." arXiv:2505.15781, May 2025.
+</div>
+
+</body>
+</html>

@@ -48,3 +48,6 @@ configs/local/
 chipmunk/
 fastdllm/
 dkv_cache/
+
+# claude file for now
+CLAUDE.md

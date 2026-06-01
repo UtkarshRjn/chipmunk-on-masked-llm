@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chipmunk: Training-Free DiT Acceleration Explained</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #181c27;
+    --bg3: #1e2333;
+    --border: #2a3050;
+    --text: #e2e8f0;
+    --muted: #8892aa;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --blue: #60a5fa;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+    --yellow: #facc15;
+    --red: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.7; font-size: 16px; }
+
+  .hero { background: linear-gradient(135deg, #0f1117 0%, #1a1040 50%, #0f1117 100%); border-bottom: 1px solid var(--border); padding: 60px 40px 50px; text-align: center; }
+  .hero h1 { font-size: 2.6rem; font-weight: 800; background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 16px; }
+  .hero .subtitle { color: var(--muted); font-size: 1.1rem; max-width: 700px; margin: 0 auto 24px; }
+  .pill-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+  .pill { background: var(--bg3); border: 1px solid var(--border); border-radius: 999px; padding: 4px 14px; font-size: 0.82rem; color: var(--muted); }
+  .pill.hl { border-color: var(--blue); color: var(--blue); }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; color: #f1f5f9; }
+  h3 { font-size: 1.15rem; font-weight: 600; margin: 28px 0 12px; color: var(--blue); }
+  p { color: #cbd5e1; margin-bottom: 14px; }
+  .slabel { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--purple); margin-bottom: 6px; }
+
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 20px 0; }
+  .card.ga { border-left: 3px solid var(--green); }
+  .card.oa { border-left: 3px solid var(--orange); }
+  .card.ba { border-left: 3px solid var(--blue); }
+  .card.pa { border-left: 3px solid var(--purple); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+
+  .callout { background: #172032; border: 1px solid #2563eb44; border-left: 3px solid var(--blue); border-radius: 8px; padding: 16px 20px; margin: 18px 0; font-size: 0.93rem; color: #93c5fd; }
+  .callout.o { background: #1f1508; border-color: #f97316aa; border-left-color: var(--orange); color: #fdba74; }
+  .callout.g { background: #0a1f14; border-color: #22c55e44; border-left-color: var(--green); color: #86efac; }
+
+  pre { background: #0d1117; border: 1px solid var(--border); border-radius: 10px; padding: 20px; font-size: 0.82rem; overflow-x: auto; color: #e2e8f0; line-height: 1.6; margin: 16px 0; }
+  .kw { color: #a78bfa; } .fn { color: #60a5fa; } .cm { color: #6b7280; } .num { color: #fb923c; }
+
+  .eq { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; font-family: 'Courier New', monospace; font-size: 0.88rem; color: var(--yellow); margin: 12px 0; overflow-x: auto; white-space: pre; }
+
+  .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0; }
+  .stat { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; text-align: center; min-width: 130px; }
+  .stat .nb { font-size: 2rem; font-weight: 800; display: block; line-height: 1; margin-bottom: 4px; }
+  .stat .lb { font-size: 0.78rem; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.88rem; }
+  th { background: var(--bg3); border: 1px solid var(--border); padding: 10px 14px; text-align: left; color: var(--muted); font-weight: 600; }
+  td { border: 1px solid var(--border); padding: 10px 14px; color: var(--text); }
+  tr:nth-child(even) td { background: var(--bg2); }
+  .tg { color: var(--green); font-weight: 700; }
+  .ty { color: var(--yellow); }
+  .tr { color: var(--red); }
+
+  .tok { width: 20px; height: 20px; border-radius: 3px; display: inline-block; vertical-align: middle; }
+  .tok.c { background: #1a3a1a; border: 1px solid var(--green); }
+  .tok.a { background: #3a1a00; border: 1px solid var(--orange); }
+  .tok.e { background: var(--bg3); border: 1px solid var(--border); }
+  .tok.d { background: #1a1a3a; border: 1px solid var(--blue); }
+
+  .legend { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin: 10px 0; font-size: 0.83rem; color: var(--muted); }
+  .ld { width: 13px; height: 13px; border-radius: 3px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+
+  .timeline { display: flex; gap: 0; overflow-x: auto; padding-bottom: 8px; margin: 24px 0; align-items: flex-start; }
+  .sbox { flex: 0 0 90px; text-align: center; position: relative; }
+  .sbox:not(:last-child)::after { content: ''; position: absolute; top: 23px; right: -10px; width: 20px; height: 2px; background: var(--border); }
+  .sc { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; margin: 0 auto 8px; }
+  .sc.dn { background: #1e3a5f; border: 2px solid var(--blue); color: var(--blue); }
+  .sc.sp { background: #2d1f3a; border: 2px solid var(--purple); color: var(--purple); }
+  .slb { font-size: 0.7rem; color: var(--muted); line-height: 1.4; }
+
+  .toc { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 32px 0 0; }
+  .toc h4 { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+  .toc a { display: block; color: #94a3b8; text-decoration: none; padding: 4px 0; font-size: 0.88rem; }
+  .toc a:hover { color: var(--blue); }
+  .toc a::before { content: '→  '; color: var(--border); }
+
+  .diagram-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 20px 0; overflow-x: auto; }
+
+  .grid8 { display: inline-grid; grid-template-columns: repeat(8, 22px); gap: 3px; }
+  .grid4 { display: inline-grid; grid-template-columns: repeat(4, 22px); gap: 3px; }
+  .col-flex { display: flex; flex-direction: column; gap: 3px; }
+  .row-flex { display: flex; gap: 3px; }
+
+  .mb { width: 26px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; }
+  .mb.c { background: #1a3a1a; border: 1px solid var(--green); color: var(--green); }
+  .mb.a { background: #3a1a00; border: 1px solid var(--orange); color: var(--orange); }
+  .mb.e { background: var(--bg3); border: 1px solid var(--border); color: var(--border); }
+  .mb.p { background: #1a1a3a; border: 1px solid var(--blue); color: var(--blue); }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="container">
+    <h1>Chipmunk</h1>
+    <p class="subtitle">Training-Free Acceleration of Diffusion Transformers with Dynamic Column-Sparse Deltas</p>
+    <div class="pill-row">
+      <span class="pill">Silveria · Govande · Fu &nbsp;|&nbsp; UCSD · Stanford · Together AI</span>
+      <span class="pill">arXiv:2506.03275 · Jun 2025</span>
+      <span class="pill hl">2.16× HunyuanVideo · 3.72× stacked</span>
+    </div>
+    <div class="toc">
+      <h4>Contents</h4>
+      <a href="#problem">01 — The Problem: Redundant Compute in DiT Inference</a>
+      <a href="#insight">02 — Core Insight: act(a @ b) @ c and Sparse Deltas</a>
+      <a href="#figure1">03 — Figure 1 Explained: Three Panels</a>
+      <a href="#kernel">04 — Column-Sparse Kernel: HBM → SRAM Gather-Pack</a>
+      <a href="#voxel">05 — Voxel Reordering</a>
+      <a href="#algorithm">06 — Full Algorithm: Dense + Sparse Steps</a>
+      <a href="#fusion">07 — Kernel Fusion: Hiding Overhead</a>
+      <a href="#results">08 — Results</a>
+      <a href="#summary">09 — Summary Diagram</a>
+    </div>
+  </div>
+</div>
+
+
+<!-- 01 PROBLEM -->
+<section id="problem">
+<div class="container">
+  <div class="slabel">01 — The Problem</div>
+  <h2>DiT inference is brutally expensive</h2>
+  <p>HunyuanVideo (13B parameters, 118k token sequence) takes <strong>18 minutes on an H100</strong> to generate a 5-second video — because diffusion runs 50 sequential forward passes, each with full attention over all tokens.</p>
+
+  <div class="two-col">
+    <div class="card oa">
+      <h3 style="margin-top:0;color:var(--orange)">Standard DiT: no reuse</h3>
+      <p>Each of the 50 steps computes:</p>
+      <ul style="color:#cbd5e1;padding-left:18px;margin-bottom:12px;">
+        <li>Full attention: <strong>O(N²)</strong> over 118k tokens</li>
+        <li>Full MLP: <strong>O(N·F)</strong> every layer</li>
+        <li>Zero reuse of any computation across steps</li>
+      </ul>
+      <div class="callout o">Every step: full compute. Even if 90% of the work produces the same result as the previous step.</div>
+    </div>
+    <div class="card ga">
+      <h3 style="margin-top:0;color:var(--green)">Key empirical observation</h3>
+      <p>Between consecutive denoising steps, the latent vector changes <em>slowly</em>. Most intermediate activations barely move:</p>
+      <ul style="color:#cbd5e1;padding-left:18px;margin-bottom:12px;">
+        <li>Attention: <strong>5–25% of values</strong> explain <strong>90%+ of change</strong></li>
+        <li>MLP: <strong>15–25% of neuron columns</strong> explain <strong>70%+ of change</strong></li>
+      </ul>
+      <div class="callout g">Cache the stable 75–95%. Recompute only the fast-changing 5–25%.</div>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat"><span class="nb" style="color:var(--blue)">5%</span><span class="lb">HunyuanVideo attention<br>active values needed</span></div>
+    <div class="stat"><span class="nb" style="color:var(--blue)">92.4%</span><span class="lb">of cross-step change<br>captured by that 5%</span></div>
+    <div class="stat"><span class="nb" style="color:var(--purple)">9.3×</span><span class="lb">attention kernel speedup<br>at 93% sparsity on H100</span></div>
+    <div class="stat"><span class="nb" style="color:var(--green)">3.72×</span><span class="lb">end-to-end speedup<br>(Chipmunk + step cache)</span></div>
+  </div>
+</div>
+</section>
+
+
+<!-- 02 INSIGHT -->
+<section id="insight">
+<div class="container">
+  <div class="slabel">02 — Core Insight</div>
+  <h2>The shared form: act(a @ b) @ c</h2>
+  <p>Chipmunk's central observation: <strong>attention and MLP share exactly the same computational skeleton</strong> — both produce a weighted sum of vectors.</p>
+
+  <div class="eq">Attention:   output = softmax( Q @ K^T ) @ V     =  act(a @ b) @ c
+MLP:         output = GeLU( X @ W_1 ) @ W_2        =  act(a @ b) @ c</div>
+
+  <p>In both cases, <code>act(a @ b)</code> produces scalar weights for each column-vector in <code>c</code>. The output is a <strong>linear combination of those vectors</strong>. Each scalar picks how much of one vector goes into the output.</p>
+
+  <h3>What a "sparse delta" is</h3>
+  <p>Between step t−1 and step t, only a small subset M of those vectors (columns of K/V or W₁/W₂) changes significantly. Call that the <strong>active set</strong>.</p>
+
+  <div class="eq">o_t  ≈  o_{t-1}
+     − [act(a_{t-1} @ b_{t-1}) * M] @ c_{t-1}   (remove old active contribution)
+     + [act(a_t     @ b_t    ) * M] @ c_t        (add new active contribution)
+
+   = o_cache + ΔO_sparse</div>
+
+  <p>Everything outside M is reused from the cache — zero recomputation.</p>
+
+  <h3>Visual: active vs cached per step</h3>
+  <p style="font-size:0.85rem;color:var(--muted);">Each square = one K/V vector (attention) or neuron column (MLP). The active set is chosen dynamically each step by <strong>magnitude of change</strong>.</p>
+
+  <div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;margin:20px 0;">
+
+    <div style="text-align:center;">
+      <div style="font-size:0.78rem;color:var(--blue);margin-bottom:8px;">Dense anchor step</div>
+      <div class="grid8">
+        <span class="tok d"></span><span class="tok d"></span><span class="tok d"></span><span class="tok d"></span>
+        <span class="tok d"></span><span class="tok d"></span><span class="tok d"></span><span class="tok d"></span>
+        <span class="tok d"></span><span class="tok d"></span><span class="tok d"></span><span class="tok d"></span>
+        <span class="tok d"></span><span class="tok d"></span><span class="tok d"></span><span class="tok d"></span>
+      </div>
+      <div style="font-size:0.7rem;color:var(--blue);margin-top:6px;">Full dense recompute<br>all caches refreshed</div>
+    </div>
+
+    <div style="text-align:center;">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">Sparse step (pattern A)</div>
+      <div class="grid8">
+        <span class="tok a"></span><span class="tok c"></span><span class="tok c"></span><span class="tok a"></span>
+        <span class="tok c"></span><span class="tok c"></span><span class="tok a"></span><span class="tok c"></span>
+        <span class="tok c"></span><span class="tok c"></span><span class="tok a"></span><span class="tok c"></span>
+        <span class="tok a"></span><span class="tok c"></span><span class="tok c"></span><span class="tok c"></span>
+      </div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:6px;">~30% recomputed (orange)<br>~70% from cache (green)</div>
+    </div>
+
+    <div style="text-align:center;">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">Sparse step (pattern B)</div>
+      <div class="grid8">
+        <span class="tok c"></span><span class="tok a"></span><span class="tok c"></span><span class="tok c"></span>
+        <span class="tok a"></span><span class="tok c"></span><span class="tok c"></span><span class="tok a"></span>
+        <span class="tok c"></span><span class="tok c"></span><span class="tok c"></span><span class="tok a"></span>
+        <span class="tok c"></span><span class="tok a"></span><span class="tok c"></span><span class="tok c"></span>
+      </div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:6px;">Different active set —<br>chosen by magnitude this step</div>
+    </div>
+
+  </div>
+
+  <div class="legend">
+    <span><span class="ld" style="background:#3a1a00;border:1px solid var(--orange)"></span>Active — recomputed (fast-changing)</span>
+    <span><span class="ld" style="background:#1a3a1a;border:1px solid var(--green)"></span>Cached — reused from previous step</span>
+    <span><span class="ld" style="background:#1a1a3a;border:1px solid var(--blue)"></span>Dense anchor — full recompute</span>
+  </div>
+</div>
+</section>
+
+
+<!-- 03 FIGURE 1 -->
+<section id="figure1">
+<div class="container">
+  <div class="slabel">03 — Figure 1 Explained</div>
+  <h2>Three panels of Figure 1</h2>
+
+  <div class="card" style="font-style:italic;color:var(--muted);font-size:0.9rem;border-left:3px solid var(--purple);">
+    <strong style="color:var(--text);font-style:normal;">Figure 1 caption (verbatim):</strong> Left: Chipmunk uses intermediate activation sparsity to recompute only the fastest changing vectors in the output linear combinations of attention and MLPs. Middle: Column sparse kernels achieve low approximation error and hardware-efficiency by packing dense SRAM tiles for peak tensor core utilization. Right: Extra operations required to compute dynamic sparse deltas, such as sparsity pattern identification and cache updates, are fused with other operations to minimize overhead.
+  </div>
+
+  <div class="two-col" style="grid-template-columns:1fr 1fr;">
+  <!-- LEFT -->
+  <div class="card ba">
+    <h3 style="margin-top:0;color:var(--blue)">Left — Sparse Cross-Step Deltas</h3>
+    <p style="font-size:0.85rem;">The latent vector traces a <strong>path in high-dimensional space</strong> across 50 steps. Each step = one direction change. Chipmunk tracks which individual output vectors in attention/MLP change direction fastest and only recomputes those.</p>
+
+    <div class="eq" style="font-size:0.78rem;">d = act(a @ b) @ c
+
+Step t-1:  d_{t-1} = Σ_j  α_j^{t-1} · c_j
+Step t:    d_t     ≈ d_{t-1}
+                    − Σ_{j∈M} α_j^{t-1} · c_j^{t-1}   ← remove old
+                    + Σ_{j∈M} α_j^t    · c_j^t         ← add new
+
+M = active set (top-k by magnitude change)</div>
+
+    <p style="font-size:0.83rem;color:var(--muted);">In the figure: the orange arrows (cached activations) flow straight between steps. Only the active set (Step 2, green) gets fresh computation. Sparse deltas <em>replace</em> the fastest-changing vectors and <em>reuse</em> the rest.</p>
+  </div>
+
+  <!-- MIDDLE -->
+  <div class="card ga">
+    <h3 style="margin-top:0;color:var(--green)">Middle — Column Sparse Kernel Tile Packing</h3>
+    <p style="font-size:0.85rem;">The active K/V rows are <strong>scattered non-contiguously in HBM</strong>. GPU tensor cores need <strong>contiguous dense tiles in SRAM</strong>. The kernel bridges this gap.</p>
+
+    <div style="margin:12px 0;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;">HBM (scattered — green=cached, orange=active)</div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:4px;">
+        <div class="mb c">c</div><div class="mb e"></div><div class="mb a">a</div>
+        <div class="mb e"></div><div class="mb c">c</div><div class="mb a">a</div>
+        <div class="mb e"></div><div class="mb c">c</div>
+      </div>
+      <div style="text-align:center;color:var(--purple);font-size:1.1rem;margin:4px 0;">↓ cp.async scatter-gather</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;">SRAM (packed dense tile — only active rows)</div>
+      <div style="display:flex;gap:3px;">
+        <div class="mb a">a</div><div class="mb a">a</div>
+        <div class="mb a">a</div><div class="mb a">a</div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--green);margin-top:6px;">Tensor cores see a dense tile → full utilization</div>
+    </div>
+
+    <p style="font-size:0.83rem;color:var(--muted);">Tensor cores never know the upstream gather was sparse. They operate on a contiguous SRAM tile — peak throughput. This is the key hardware trick.</p>
+  </div>
+  </div>
+
+  <!-- RIGHT — full width -->
+  <div class="card oa">
+    <h3 style="margin-top:0;color:var(--orange)">Right — Dynamic Sparsity Kernel Fusion</h3>
+    <p style="font-size:0.85rem;">Computing <em>which</em> columns are active (top-k selection via column-sum) and updating the activation cache both add overhead. Without fusion they cost ~3× extra. Chipmunk <strong>overlaps them with other compute via warp specialization</strong>.</p>
+
+    <div class="two-col">
+      <div>
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:8px;"><strong style="color:var(--text)">Attention (SM 1):</strong></p>
+        <div class="eq" style="font-size:0.75rem;">sm(q @ k^T)  A @ v
+────────────────────
+ Column Sum (fused)
+→ sparsity pattern ID
+   during dense step</div>
+        <p style="font-size:0.78rem;color:var(--muted);">Column-sum runs inside the same kernel as attention. No extra pass needed.</p>
+      </div>
+      <div>
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:8px;"><strong style="color:var(--text)">MLP (SM 1 + SM 2 + SM 3):</strong></p>
+        <div class="eq" style="font-size:0.75rem;">gelu(x @ W_1^idx)  o_cache += d @ W_2^idx
+
+d = A − A^idx_cache
+A^idx_cache += d
+→ cache writeback overlapped
+   with W_2 matmul</div>
+        <p style="font-size:0.78rem;color:var(--muted);">Cache I/O runs on separate warps while MLP second layer computes.</p>
+      </div>
+    </div>
+    <div class="callout o" style="margin-top:8px;">Result: sparsity pattern ID and cache updates are effectively free — hidden inside existing compute via warp specialization.</div>
+  </div>
+
+</div>
+</section>
+
+
+<!-- 04 KERNEL -->
+<section id="kernel">
+<div class="container">
+  <div class="slabel">04 — The Kernel</div>
+  <h2>Column-Sparse Gather: HBM → SRAM</h2>
+
+  <p>Standard GPU kernels (FlashAttention, cuBLAS) load <em>contiguous</em> chunks from HBM. Chipmunk's active set is arbitrary positions scattered across HBM. The fix: <code>cp.async</code> per-thread independent loads into a contiguous SRAM buffer.</p>
+
+  <!-- ── NEW: token meaning + shape explanation ── -->
+  <h3>What are the 118,000 tokens? (not video history)</h3>
+  <div class="card" style="border-left:3px solid var(--yellow);margin-bottom:8px;">
+    <p style="font-size:0.85rem;">Common confusion: in GPT, each token attends to its <em>past history</em> (causal). DiT is completely different — <strong>the entire video is denoised at once</strong>. All frames exist in the latent simultaneously from the very first step.</p>
+    <div class="eq">HunyuanVideo token layout:
+
+ T frames × H patches × W patches
+ ≈ 80 × 45 × 80  →  ~288k positions  →  compressed to 118k tokens
+
+ Token (t=0,  h=5, w=10)  =  patch at frame 0,  position (5,10)
+ Token (t=60, h=5, w=10)  =  same spatial position, frame 60
+
+ Both exist simultaneously in the latent.
+ Every token attends to every other token (no causal mask).
+ "All tokens" = all space + all time in the video, right now.</div>
+    <p style="font-size:0.83rem;color:var(--muted);">Across the 50 denoising steps, the latent gradually gets cleaner — that is the only "temporal history." Inside any one step, attention sees the full video at once.</p>
+  </div>
+
+  <h3>Q, K, V shapes — normal dense vs Chipmunk sparse (one attention head)</h3>
+  <div class="two-col" style="margin-bottom:8px;">
+
+    <div class="card oa">
+      <h3 style="margin-top:0;color:var(--orange)">Normal dense attention</h3>
+      <div class="eq" style="font-size:0.76rem;">N = 118,000   d = 128 (per-head dim)
+
+Q : [N, d] = [118k, 128]   one query per token
+K : [N, d] = [118k, 128]   one key   per token
+V : [N, d] = [118k, 128]   one value per token
+
+─── computation ───────────────────────────────
+
+scores = Q  @  K^T
+       [N,d] @ [d,N]  →  [N, N]
+    = [118k,128] @ [128,118k]  →  [118k, 118k]
+    = 13.9 BILLION entries  ← the expensive matrix
+
+weights = softmax(scores / √128)   [N, N]
+
+out = weights  @  V
+    [N,N] @ [N,d]  →  [N, d]
+
+cost: O(N² · d) per head</div>
+      <div class="callout o">The [118k × 118k] score matrix is recomputed <strong>50× per video</strong>, across all layers and heads. At 18 min on H100, this is the bottleneck.</div>
+    </div>
+
+    <div class="card ga">
+      <h3 style="margin-top:0;color:var(--green)">Chipmunk sparse (5% active)</h3>
+      <div class="eq" style="font-size:0.76rem;">k = 5% × N = 5,900   d = 128
+
+Q   : [N, d] = [118k, 128]   unchanged — need all queries
+K   : [N, d] stored in HBM
+      gather k rows  →  K_idx : [k, d] = [5.9k, 128]
+V   : [N, d] stored in HBM
+      gather k rows  →  V_idx : [k, d] = [5.9k, 128]
+
+─── sparse computation ────────────────────────
+
+delta_scores = Q  @  K_idx^T
+             [N,d] @ [d,k]  →  [N, k]
+          = [118k,128] @ [128,5.9k]  →  [118k, 5.9k]
+          = 696M entries  (vs 13.9B)  → 20× smaller ✓
+
+weights = softmax(delta_scores / √128)   [N, k]
+
+ΔO = weights  @  V_idx
+   [N,k] @ [k,d]  →  [N, d]
+
+O  = O_cache + ΔO          ← add sparse delta to cache
+
+cost: O(N · k · d) per head</div>
+      <div class="callout g"><strong>Q stays full [N, d]</strong> — every token still asks its own question. Only K and V are reduced: Chipmunk gathers just the k=5% of key/value vectors that changed most since the last dense step.</div>
+    </div>
+
+  </div>
+
+  <div class="callout" style="margin-bottom:24px;">
+    <strong>Why Q stays full but K, V shrink:</strong>
+    Q = "what am I searching for?" — every token needs to ask its own question, so Q cannot be reduced.
+    K = "what do I offer?" and V = "what do I give?" — Chipmunk identifies which K/V positions changed most (the active set M) and gathers only those rows from HBM into a packed SRAM tile.
+    The multiplication Q @ K_idx^T scores each query against only the active keys. Everything else reuses the previous step's output via O_cache.
+  </div>
+  <!-- ── end new section ── -->
+
+  <div class="two-col">
+    <div class="card">
+      <h3 style="margin-top:0;">Why unstructured sparsity is slow</h3>
+      <p style="font-size:0.85rem;">GPU tensor cores need at least <strong>64×64 tiles</strong> in SRAM to achieve peak throughput. Unstructured [1,1] sparsity produces tiny scattered tiles — tensor cores starve.</p>
+      <div style="margin:12px 0;font-size:0.8rem;color:var(--muted);">Unstructured: active positions scattered everywhere</div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;max-width:180px;">
+        <span class="tok a"></span><span class="tok e"></span><span class="tok e"></span><span class="tok a"></span>
+        <span class="tok e"></span><span class="tok a"></span><span class="tok e"></span><span class="tok e"></span>
+        <span class="tok e"></span><span class="tok e"></span><span class="tok a"></span><span class="tok e"></span>
+        <span class="tok a"></span><span class="tok e"></span><span class="tok e"></span><span class="tok a"></span>
+      </div>
+      <div style="font-size:0.72rem;color:var(--red);margin-top:6px;">Cannot form 64×64 tile → tensor cores idle</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">Column sparsity + gather-pack</h3>
+      <p style="font-size:0.85rem;">Select <strong>whole columns</strong> of K/V or W matrix. Gather them (scattered in HBM) into a contiguous SRAM tile. Tensor cores see a normal dense tile.</p>
+      <div style="margin:12px 0;font-size:0.8rem;color:var(--muted);">Column-sparse: select full columns 1 and 4</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <div class="col-flex"><span class="tok a"></span><span class="tok a"></span><span class="tok a"></span><span class="tok a"></span></div>
+        <div class="col-flex"><span class="tok c"></span><span class="tok c"></span><span class="tok c"></span><span class="tok c"></span></div>
+        <div class="col-flex"><span class="tok c"></span><span class="tok c"></span><span class="tok c"></span><span class="tok c"></span></div>
+        <div class="col-flex"><span class="tok a"></span><span class="tok a"></span><span class="tok a"></span><span class="tok a"></span></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--purple);margin-bottom:6px;">→ gather cols 1,4 via cp.async →</div>
+      <div style="display:flex;gap:6px;">
+        <div class="col-flex"><span class="tok a"></span><span class="tok a"></span><span class="tok a"></span><span class="tok a"></span></div>
+        <div class="col-flex"><span class="tok a"></span><span class="tok a"></span><span class="tok a"></span><span class="tok a"></span></div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--green);margin-top:6px;">Dense 2-column SRAM tile → full tensor-core throughput</div>
+    </div>
+  </div>
+
+  <h3>Block sparsity vs Column sparsity — the tradeoff</h3>
+  <p style="font-size:0.85rem;">Block sparsity skips whole 192×128 tiles (fastest) but each tile may contain many stable positions — high approximation error. Column sparsity selects exactly the columns that changed most — 2× better accuracy at similar speed.</p>
+
+  <table>
+    <thead><tr><th>Method</th><th>Sparsity</th><th>Approx Error (unexplained var)</th><th>Runtime vs Dense</th></tr></thead>
+    <tbody>
+      <tr><td>[192,128] Block — Attention</td><td>95%</td><td class="tr">17.4%</td><td class="tg">5.1%</td></tr>
+      <tr><td>[192,1] Column — Attention</td><td>95%</td><td class="tg">8.5%</td><td class="ty">8.5%</td></tr>
+      <tr><td>[192,128] Block — MLP</td><td>75%</td><td class="tr">61.3%</td><td class="tg">27.1%</td></tr>
+      <tr><td>[192,1] Column — MLP</td><td>75%</td><td class="tg">29.1%</td><td class="ty">27.7%</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Kernel speedup vs FlashAttention-3 (H100-SXM5)</h3>
+  <div class="diagram-wrap">
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:80px;font-size:0.78rem;color:var(--muted);text-align:right;flex-shrink:0;">70% sparse</div>
+        <div style="height:24px;width:186px;background:linear-gradient(90deg,#1e3a5f,#60a5fa);border-radius:4px;display:flex;align-items:center;padding-left:10px;"><span style="font-size:0.75rem;color:white;font-weight:700;">~3.1×</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:80px;font-size:0.78rem;color:var(--muted);text-align:right;flex-shrink:0;">80% sparse</div>
+        <div style="height:24px;width:270px;background:linear-gradient(90deg,#1e3a5f,#60a5fa);border-radius:4px;display:flex;align-items:center;padding-left:10px;"><span style="font-size:0.75rem;color:white;font-weight:700;">~4.5×</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:80px;font-size:0.78rem;color:var(--muted);text-align:right;flex-shrink:0;">93% sparse</div>
+        <div style="height:24px;width:558px;max-width:100%;background:linear-gradient(90deg,#1e3a5f,#a78bfa);border-radius:4px;display:flex;align-items:center;padding-left:10px;"><span style="font-size:0.75rem;color:white;font-weight:700;">9.3× vs FlashAttention-3</span></div>
+      </div>
+    </div>
+    <div style="font-size:0.72rem;color:var(--muted);margin-top:14px;">Runtime scales nearly linearly with sparsity. At 93% sparsity: only 7% of K/V vectors recomputed per step.</div>
+  </div>
+
+  <div class="callout">
+    The chunk size C=192 is chosen specifically for H100 GPU. It's large enough for tensor cores to run efficiently, and corresponds naturally to a 3D voxel of pixels in video generation.
+  </div>
+</div>
+</section>
+
+
+<!-- 05 VOXEL -->
+<section id="voxel">
+<div class="container">
+  <div class="slabel">05 — Voxel Reordering</div>
+  <h2>Why token order matters for approximation quality</h2>
+
+  <p>Column sparsity means a <em>contiguous chunk of C=192 tokens shares one sparsity pattern</em> — they all activate the same K/V columns. For this to be accurate, tokens in the same chunk should be <strong>spatially similar</strong> (attend to the same things).</p>
+
+  <div class="two-col">
+    <div class="card">
+      <h3 style="margin-top:0;">Default: raster order</h3>
+      <p style="font-size:0.85rem;">Tokens laid out left→right, top→bottom, frame 1 then frame 2... A chunk of 192 spans a horizontal strip. Tokens at opposite ends of the strip may have very different content — shared sparsity pattern is inaccurate.</p>
+      <svg viewBox="0 0 240 110" width="100%" style="max-width:240px;margin:8px auto;display:block;">
+        <rect x="5" y="5" width="230" height="60" rx="3" fill="#181c27" stroke="#374151"/>
+        <rect x="5" y="5" width="115" height="30" rx="0" fill="#fb923c" opacity="0.3"/>
+        <text x="62" y="24" fill="#fb923c" font-size="8" text-anchor="middle">chunk 1 (192 tokens)</text>
+        <line x1="5" y1="35" x2="235" y2="35" stroke="#374151" stroke-width="0.5"/>
+        <line x1="120" y1="5" x2="120" y2="65" stroke="#374151" stroke-width="0.5"/>
+        <text x="120" y="80" fill="#6b7280" font-size="7" text-anchor="middle">Frame 1 — raster order</text>
+        <text x="5" y="100" fill="#f87171" font-size="7">Problem: tokens at start and end of chunk may differ greatly</text>
+      </svg>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Voxel order (Chipmunk)</h3>
+      <p style="font-size:0.85rem;">Reorder tokens so each chunk of 192 = a 3D cube (voxel) of spatially nearby pixels across frames. Pixels in the same small 3D region have similar color/texture → similar attention patterns → shared sparsity is accurate.</p>
+      <svg viewBox="0 0 240 110" width="100%" style="max-width:240px;margin:8px auto;display:block;">
+        <!-- isometric voxel cube 1 -->
+        <polygon points="40,70 70,55 100,70 70,85" fill="#1a3a1a" stroke="#4ade80" stroke-width="1.2"/>
+        <polygon points="40,70 40,88 70,103 70,85" fill="#0f2a0f" stroke="#4ade80" stroke-width="1.2"/>
+        <polygon points="100,70 100,88 70,103 70,85" fill="#162a16" stroke="#4ade80" stroke-width="1.2"/>
+        <text x="70" y="74" fill="#4ade80" font-size="7" text-anchor="middle">chunk 1</text>
+        <!-- voxel cube 2 -->
+        <polygon points="115,70 145,55 175,70 145,85" fill="#1a1a3a" stroke="#60a5fa" stroke-width="1.2"/>
+        <polygon points="115,70 115,88 145,103 145,85" fill="#0f0f2a" stroke="#60a5fa" stroke-width="1.2"/>
+        <polygon points="175,70 175,88 145,103 145,85" fill="#12122a" stroke="#60a5fa" stroke-width="1.2"/>
+        <text x="145" y="74" fill="#60a5fa" font-size="7" text-anchor="middle">chunk 2</text>
+        <text x="5" y="15" fill="#4ade80" font-size="7">Each voxel = spatially nearby pixels across frames</text>
+        <text x="5" y="27" fill="#4ade80" font-size="7">→ similar content → accurate shared sparsity ✓</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="callout g">
+    Voxel reordering improves attention approximation quality by <strong>1.2×</strong> (2× for MLP, negligible — MLP sparsity doesn't depend on spatial locality the same way). Applied once at generation start, reversed before VAE decode. Zero extra compute.
+  </div>
+
+  <pre><span class="cm"># Voxel reordering — one-time permutation at start of generation</span>
+<span class="kw">def</span> <span class="fn">voxel_reorder</span>(tokens, T, H, W, vt=<span class="num">4</span>, vh=<span class="num">2</span>, vw=<span class="num">2</span>):
+    <span class="cm"># tokens: [T, H, W, D] in raster order</span>
+    tokens = tokens.reshape(T//vt, vt, H//vh, vh, W//vw, vw, D)
+    <span class="cm"># Permute so dim-0 = voxel index, dims-1,2,3 = within-voxel</span>
+    tokens = tokens.permute(<span class="num">0</span>, <span class="num">2</span>, <span class="num">4</span>, <span class="num">1</span>, <span class="num">3</span>, <span class="num">5</span>, <span class="num">6</span>)
+    <span class="kw">return</span> tokens.reshape(-<span class="num">1</span>, D)
+    <span class="cm"># Now contiguous chunk of C=192 = one voxel = spatially local</span></pre>
+</div>
+</section>
+
+
+<!-- 06 ALGORITHM -->
+<section id="algorithm">
+<div class="container">
+  <div class="slabel">06 — Full Algorithm</div>
+  <h2>Dense + Sparse Steps Interleaved</h2>
+  <p>Across 50 denoising steps: <strong>1 dense anchor step every 10 sparse steps</strong>. Dense steps refresh the cache; sparse steps exploit it.</p>
+
+  <div class="timeline">
+    <div class="sbox"><div class="sc dn">D</div><div class="slb">Dense<br>Step 1<br><span style="color:var(--blue)">anchor</span></div></div>
+    <div class="sbox"><div class="sc sp">S</div><div class="slb">Sparse<br>Step 2</div></div>
+    <div class="sbox"><div class="sc sp">S</div><div class="slb">Sparse<br>Step 3</div></div>
+    <div class="sbox"><div class="sc sp">S</div><div class="slb">Sparse<br>Step 4</div></div>
+    <div class="sbox" style="opacity:0.4"><div class="sc sp">S</div><div class="slb">…</div></div>
+    <div class="sbox"><div class="sc sp">S</div><div class="slb">Sparse<br>Step 10</div></div>
+    <div class="sbox"><div class="sc dn">D</div><div class="slb">Dense<br>Step 11<br><span style="color:var(--blue)">re-anchor</span></div></div>
+    <div class="sbox"><div class="sc sp">S</div><div class="slb">Sparse<br>Step 12</div></div>
+    <div class="sbox" style="opacity:0.4"><div class="sc sp">S</div><div class="slb">…</div></div>
+  </div>
+
+  <h3>Dense Step — Attention</h3>
+  <div class="card ba">
+    <p style="font-size:0.85rem;">Run full FlashAttention. Then compute a <strong>column-sum</strong> — for each voxel of 192 tokens, sum how much total attention probability it assigns to each key position. Top-k over this gives the most-attended keys per voxel.</p>
+    <div class="eq">D[voxel_i, key_j] = Σ_{q ∈ voxel_i}  softmax(Q @ K^T)[q, j]
+
+idx[voxel_i] = TopK_k( D[voxel_i, :] )        ← cached for sparse steps
+
+O_cache = O_dense − softmax(Q @ K_idx^T) @ V_idx   ← enables additive deltas</div>
+    <p style="font-size:0.83rem;color:var(--muted);">Column-sum is fused into the FlashAttention kernel — no extra pass. Top-k uses an approximate bucket-based kernel (3.42× faster than PyTorch topk).</p>
+  </div>
+
+  <h3>Sparse Step — Attention</h3>
+  <div class="card pa">
+    <p style="font-size:0.85rem;">Only recompute the <strong>k keys/values identified in the last dense step</strong>. Gather them from scattered HBM positions via cp.async, pack into SRAM, run wgmma.</p>
+    <div class="eq">ΔO = softmax( Q @ K_idx^T ) @ V_idx
+O  = O_cache + ΔO
+
+Complexity: O(N·k)  not  O(N²)
+At 5% active (HunyuanVideo): k = 0.05N  →  20× fewer FLOPs</div>
+  </div>
+
+  <h3>Dense Step — MLP</h3>
+  <div class="card ba">
+    <p style="font-size:0.85rem;">Run full MLP. Cache three tensors for the sparse steps to come:</p>
+    <ol style="color:#cbd5e1;padding-left:18px;font-size:0.85rem;">
+      <li><strong>T_m</strong> — tile-mean pre-activation per voxel: cheap proxy for which neurons change</li>
+      <li><strong>A_cache</strong> — full GeLU activation tensor</li>
+      <li><strong>M_cache</strong> — full MLP output (so deltas can add to it)</li>
+    </ol>
+  </div>
+
+  <h3>Sparse Step — MLP</h3>
+  <div class="card pa">
+    <p style="font-size:0.85rem;">Compute tile-mean of current activations and compare to cached tile-mean to find which neuron columns changed most. Only compute those.</p>
+    <div class="eq">Δt_m = |T_current − T_m_cached|           ← cheap: tile-means, not full activations
+idx  = TopK_k( Δt_m )                   ← k neurons that changed most per voxel
+
+ΔM = GeLU(X @ W1_idx − A_cache_idx) @ W2_idx
+O  = M_cache + ΔM</div>
+    <p style="font-size:0.83rem;color:var(--muted);">The subtraction <code>− A_cache_idx</code> is the delta (only recompute what changed). Cache writeback overlaps with W₂ matmul via warp specialization.</p>
+  </div>
+
+  <h3>End-to-end pseudocode</h3>
+  <pre><span class="kw">def</span> <span class="fn">chipmunk_inference</span>(model, noise, steps=<span class="num">50</span>, M=<span class="num">10</span>):
+    x = <span class="fn">voxel_reorder</span>(noise)              <span class="cm"># once at start</span>
+    attn_cache = mlp_cache = <span class="kw">None</span>
+
+    <span class="kw">for</span> t <span class="kw">in</span> <span class="fn">range</span>(steps, <span class="num">0</span>, -<span class="num">1</span>):
+        <span class="kw">if</span> t % M == <span class="num">0</span>:                     <span class="cm"># dense anchor every M steps</span>
+            Q, K, V = model.<span class="fn">qkv</span>(x, t)
+            O_dense  = <span class="fn">flash_attention</span>(Q, K, V)      <span class="cm"># full O(N²)</span>
+            col_sum  = <span class="fn">column_sum_fused</span>(O_dense)      <span class="cm"># fused — free</span>
+            idx_attn = <span class="fn">approx_topk</span>(col_sum, k=attn_k)
+            attn_cache = <span class="fn">build_attn_cache</span>(O_dense, Q, K, V, idx_attn)
+
+            A_full   = <span class="fn">gelu</span>(x @ W1)
+            T_m      = <span class="fn">tile_mean</span>(x @ W1, C=<span class="num">192</span>)
+            mlp_cache = (T_m, A_full, A_full @ W2)
+
+        <span class="kw">else</span>:                               <span class="cm"># sparse step</span>
+            <span class="cm"># Attention: gather active K,V → pack → wgmma</span>
+            K_idx, V_idx = <span class="fn">cp_async_gather</span>(K, V, attn_cache.idx)
+            delta_O = <span class="fn">wgmma</span>(Q, K_idx, V_idx)
+            O = attn_cache.O_cache + delta_O  <span class="cm"># O(N·k)</span>
+
+            <span class="cm"># MLP: tile-mean diff → top-k neurons → sparse compute</span>
+            T_m_new = <span class="fn">tile_mean</span>(x @ W1, C=<span class="num">192</span>)
+            idx_mlp = <span class="fn">approx_topk</span>(|T_m_new - mlp_cache.T_m|, k=mlp_k)
+            delta_M = <span class="fn">sparse_mlp</span>(x, W1, W2, idx_mlp, mlp_cache.A)
+            O_mlp   = mlp_cache.M_cache + delta_M
+
+        x = <span class="fn">apply_residual</span>(x, O, O_mlp)
+
+    x = <span class="fn">voxel_unreorder</span>(x)               <span class="cm"># reverse before VAE</span>
+    <span class="kw">return</span> vae.<span class="fn">decode</span>(x)</pre>
+</div>
+</section>
+
+
+<!-- 07 FUSION -->
+<section id="fusion">
+<div class="container">
+  <div class="slabel">07 — Kernel Fusion</div>
+  <h2>Hiding the overhead of dynamic sparsity</h2>
+  <p>Without fusion, identifying the active set (column-sum, top-k) and maintaining the cache would add ~3× overhead per sparse step. Chipmunk fuses everything to near-zero cost.</p>
+
+  <table>
+    <thead><tr><th>Operation</th><th>Unfused baseline</th><th>Fused</th><th>Speedup</th></tr></thead>
+    <tbody>
+      <tr><td>Attention + column-sum</td><td class="tr">2 separate passes</td><td class="tg">Fused into single attention kernel</td><td class="tg">3.26×</td></tr>
+      <tr><td>MLP + cache writeback</td><td class="tr">Sequential</td><td class="tg">Overlapped with W₂ matmul (warp-spec)</td><td class="tg">1.41×</td></tr>
+      <tr><td>Mask → indices conversion</td><td class="tr">Separate kernel</td><td class="tg">Fused with column-sum kernel</td><td class="tg">1.39×</td></tr>
+      <tr><td>Top-k selection</td><td class="tr">PyTorch torch.topk</td><td class="tg">Approximate bucket-based top-k</td><td class="tg">3.42×</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    The <strong>approximate top-k</strong> uses bucket counting (histogram) to find the k-th largest threshold, then selects all elements above it. This gives 3.42× speedup over exact sorting with negligible accuracy loss on sparsity pattern selection.
+  </div>
+
+  <div class="callout o">
+    <strong>Warp specialization</strong>: on an H100 SM, Chipmunk dedicates some warps to data loading (cp.async gather of active K/V from HBM) and other warps to compute (wgmma tensor-core GEMM). Producer and consumer warps run in a pipeline — compute never stalls waiting for memory.
+  </div>
+</div>
+</section>
+
+
+<!-- 08 RESULTS -->
+<section id="results">
+<div class="container">
+  <div class="slabel">08 — Results</div>
+  <h2>How fast, and at what quality cost?</h2>
+
+  <h3>Video generation — HunyuanVideo (H100-SXM5, 720p × 5s, 50 steps)</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Speedup</th><th>Latency</th><th>VBench Total</th><th>VBench Quality</th></tr></thead>
+    <tbody>
+      <tr><td>HunyuanVideo (dense)</td><td>1×</td><td>1030s</td><td class="tg">83.24</td><td class="tg">85.09</td></tr>
+      <tr><td>STA (sliding tile attention)</td><td class="ty">1.79×</td><td>575s</td><td>82.46</td><td>84.63</td></tr>
+      <tr><td><strong>Chipmunk</strong></td><td class="tg"><strong>2.16×</strong></td><td><strong>477s</strong></td><td class="tg"><strong>82.94</strong></td><td><strong>84.60</strong></td></tr>
+      <tr><td>Step Caching (TeaCache)</td><td class="tg">3.69×</td><td>279s</td><td class="tr">80.79</td><td class="tr">82.87</td></tr>
+      <tr><td><strong>Chipmunk + Step Cache</strong></td><td class="tg"><strong>3.72×</strong></td><td><strong>277s</strong></td><td class="tg"><strong>82.50</strong></td><td class="tg"><strong>84.23</strong></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout g">
+    Key result: Chipmunk + Step Cache achieves the <strong>same 3.72× speedup as TeaCache alone</strong>, but with significantly better quality (82.50 vs 80.79 VBench). Fine-grained caching preserves what coarse step-skipping destroys.
+  </div>
+
+  <h3>Image generation — FLUX.1-dev (H100-SXM5, 768×1280, 50 steps)</h3>
+  <table>
+    <thead><tr><th>Method</th><th>FLOPs</th><th>Speedup</th><th>ImageReward</th></tr></thead>
+    <tbody>
+      <tr><td>FLUX.1-dev (dense)</td><td>100%</td><td>1×</td><td>0.76</td></tr>
+      <tr><td>STA</td><td>84%</td><td>1.15×</td><td>0.75</td></tr>
+      <tr><td>DiTFastAttn</td><td>83%</td><td>1.09×</td><td>0.80</td></tr>
+      <tr><td><strong>Chipmunk</strong></td><td class="tg"><strong>58%</strong></td><td class="tg"><strong>1.41×</strong></td><td class="tg"><strong>0.80</strong></td></tr>
+      <tr><td>TeaCache</td><td class="tg">39%</td><td class="tg">2.51×</td><td class="tr">0.68</td></tr>
+      <tr><td><strong>Chipmunk + Step Cache</strong></td><td class="tg"><strong>31%</strong></td><td class="tg"><strong>2.56×</strong></td><td><strong>0.77</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Why Chipmunk sometimes improves quality</h3>
+  <div class="card">
+    <p>At ~90% attention sparsity, Chipmunk focuses attention on the <strong>most-attended keys</strong> — which tend to correspond to the subject of the prompt. Human-preference metrics (ImageReward) and CLIP reward subject-prominent generations.</p>
+    <p style="font-size:0.85rem;color:var(--muted);">Failure mode: backgrounds can appear slightly blurred, because background tokens are deprioritized by the sparse attention pattern (fewer attention weights pointing to them).</p>
+  </div>
+
+  <h3>Composability — stacking with other methods</h3>
+  <div class="callout">
+    Chipmunk operates at <strong>within-step, within-layer granularity</strong> (individual K/V vectors). It is orthogonal to and stacks naturally with:<br><br>
+    • <strong>Step caching</strong> (TeaCache) — skip whole steps ✓<br>
+    • <strong>Layer caching</strong> (BlockCache) — skip whole layers ✓<br>
+    • <strong>Token caching</strong> (ToCa) — skip whole tokens ✓<br><br>
+    The stacking is native because Chipmunk's caches live at finer granularity than any of these — they don't interfere.
+  </div>
+</div>
+</section>
+
+
+<!-- 09 SUMMARY -->
+<section id="summary" style="border-bottom:none;">
+<div class="container">
+  <div class="slabel">09 — Summary</div>
+  <h2>The full picture</h2>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 860 330" width="100%" style="max-width:860px;display:block;margin:0 auto;">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <path d="M0,0 L0,7 L8,3.5 z" fill="#4b5563"/>
+        </marker>
+        <marker id="arr-p" markerWidth="8" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <path d="M0,0 L0,7 L8,3.5 z" fill="#a78bfa"/>
+        </marker>
+      </defs>
+
+      <!-- Title -->
+      <text x="430" y="20" fill="#f1f5f9" font-size="13" font-weight="700" text-anchor="middle">Chipmunk End-to-End Generation Flow (50 steps)</text>
+
+      <!-- Step 1: Voxel reorder -->
+      <rect x="10" y="35" width="115" height="55" rx="7" fill="#0f2030" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="67" y="55" fill="#60a5fa" font-size="9" text-anchor="middle" font-weight="700">VOXEL REORDER</text>
+      <text x="67" y="68" fill="#94a3b8" font-size="7.5" text-anchor="middle">raster → voxel order</text>
+      <text x="67" y="80" fill="#94a3b8" font-size="7.5" text-anchor="middle">one-time, start only</text>
+      <line x1="125" y1="63" x2="155" y2="63" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- DENSE STEP box -->
+      <rect x="155" y="30" width="175" height="240" rx="7" fill="#0f1a2e" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="242" y="50" fill="#60a5fa" font-size="10" text-anchor="middle" font-weight="700">DENSE STEP</text>
+      <text x="242" y="63" fill="#6b7280" font-size="8" text-anchor="middle">(every 10th step — anchors cache)</text>
+
+      <text x="165" y="82" fill="#94a3b8" font-size="8">Attention:</text>
+      <text x="165" y="95" fill="#e2e8f0" font-size="7.5">1. Full FlashAttention O(N²)</text>
+      <text x="165" y="107" fill="#e2e8f0" font-size="7.5">2. Column-sum (fused into kernel)</text>
+      <text x="165" y="119" fill="#e2e8f0" font-size="7.5">3. approx top-k → idx cache</text>
+      <text x="165" y="131" fill="#e2e8f0" font-size="7.5">4. Build O_cache for delta steps</text>
+      <line x1="165" y1="140" x2="320" y2="140" stroke="#374151" stroke-width="0.5"/>
+      <text x="165" y="156" fill="#94a3b8" font-size="8">MLP:</text>
+      <text x="165" y="169" fill="#e2e8f0" font-size="7.5">1. Full GeLU(X@W₁) @ W₂</text>
+      <text x="165" y="181" fill="#e2e8f0" font-size="7.5">2. Cache tile-mean T_m</text>
+      <text x="165" y="193" fill="#e2e8f0" font-size="7.5">3. Cache activations A_cache</text>
+      <text x="165" y="205" fill="#e2e8f0" font-size="7.5">4. Cache output M_cache</text>
+      <line x1="165" y1="215" x2="320" y2="215" stroke="#374151" stroke-width="0.5"/>
+      <text x="242" y="232" fill="#60a5fa" font-size="8" text-anchor="middle">Error resets to 0 after anchor</text>
+      <text x="242" y="244" fill="#6b7280" font-size="7" text-anchor="middle">Runs on steps 1, 11, 21, 31, 41, 51</text>
+
+      <!-- Arrow dense→sparse -->
+      <line x1="330" y1="63" x2="365" y2="63" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arr-p)"/>
+      <text x="347" y="55" fill="#a78bfa" font-size="7.5" text-anchor="middle">×9 sparse</text>
+      <text x="347" y="65" fill="#a78bfa" font-size="7.5" text-anchor="middle">steps</text>
+
+      <!-- SPARSE STEP box -->
+      <rect x="365" y="30" width="175" height="240" rx="7" fill="#1a0f2e" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="452" y="50" fill="#a78bfa" font-size="10" text-anchor="middle" font-weight="700">SPARSE STEP</text>
+      <text x="452" y="63" fill="#6b7280" font-size="8" text-anchor="middle">(9 of every 10 steps)</text>
+
+      <text x="375" y="82" fill="#94a3b8" font-size="8">Attention  O(N·k):</text>
+      <text x="375" y="95" fill="#e2e8f0" font-size="7.5">1. cp.async gather K,V at idx</text>
+      <text x="375" y="107" fill="#e2e8f0" font-size="7.5">2. Pack into contiguous SRAM tile</text>
+      <text x="375" y="119" fill="#e2e8f0" font-size="7.5">3. wgmma → ΔO</text>
+      <text x="375" y="131" fill="#e2e8f0" font-size="7.5">4. O = O_cache + ΔO</text>
+      <line x1="375" y1="140" x2="530" y2="140" stroke="#374151" stroke-width="0.5"/>
+      <text x="375" y="156" fill="#94a3b8" font-size="8">MLP  O(N·k):</text>
+      <text x="375" y="169" fill="#e2e8f0" font-size="7.5">1. tile-mean T of cur activations</text>
+      <text x="375" y="181" fill="#e2e8f0" font-size="7.5">2. |T − T_m| → top-k neurons</text>
+      <text x="375" y="193" fill="#e2e8f0" font-size="7.5">3. Sparse W₁_idx · W₂_idx</text>
+      <text x="375" y="205" fill="#e2e8f0" font-size="7.5">4. O = M_cache + ΔM</text>
+      <line x1="375" y1="215" x2="530" y2="215" stroke="#374151" stroke-width="0.5"/>
+      <text x="452" y="232" fill="#a78bfa" font-size="8" text-anchor="middle">HunyuanVideo: only 5% of</text>
+      <text x="452" y="244" fill="#a78bfa" font-size="8" text-anchor="middle">K/V recomputed per step</text>
+
+      <!-- Loop arrow back -->
+      <path d="M 452,275 Q 452,300 330,300 Q 208,300 208,275" fill="none" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arr)" stroke-dasharray="5,3"/>
+      <text x="330" y="316" fill="#6b7280" font-size="7.5" text-anchor="middle">loop until next dense anchor</text>
+
+      <!-- Arrow to unreorder -->
+      <line x1="540" y1="63" x2="575" y2="63" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="557" y="55" fill="#6b7280" font-size="7" text-anchor="middle">all 50</text>
+      <text x="557" y="66" fill="#6b7280" font-size="7" text-anchor="middle">done</text>
+
+      <!-- Voxel unreorder -->
+      <rect x="575" y="35" width="115" height="55" rx="7" fill="#0f2030" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="632" y="55" fill="#60a5fa" font-size="9" text-anchor="middle" font-weight="700">VOXEL UNREORDER</text>
+      <text x="632" y="68" fill="#94a3b8" font-size="7.5" text-anchor="middle">reverse permutation</text>
+      <text x="632" y="80" fill="#94a3b8" font-size="7.5" text-anchor="middle">before VAE decode</text>
+
+      <line x1="690" y1="63" x2="720" y2="63" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- VAE decode -->
+      <rect x="720" y="35" width="125" height="55" rx="7" fill="#0f1f0f" stroke="#4ade80" stroke-width="1.5"/>
+      <text x="782" y="55" fill="#4ade80" font-size="9" text-anchor="middle" font-weight="700">VAE DECODE</text>
+      <text x="782" y="68" fill="#94a3b8" font-size="7.5" text-anchor="middle">latent → pixels</text>
+      <text x="782" y="80" fill="#4ade80" font-size="7.5" text-anchor="middle">final image / video 🎬</text>
+
+      <!-- Speedup box -->
+      <rect x="10" y="280" width="545" height="42" rx="6" fill="#181c27" stroke="#374151"/>
+      <text x="280" y="298" fill="#f1f5f9" font-size="9" text-anchor="middle" font-weight="700">Key numbers (HunyuanVideo)</text>
+      <text x="20" y="314" fill="#60a5fa" font-size="8">Dense steps: 5 of 50 (full O(N²))</text>
+      <text x="200" y="314" fill="#a78bfa" font-size="8">Sparse steps: 45 of 50 (O(N·0.05N))</text>
+      <text x="400" y="314" fill="#4ade80" font-size="8">Result: 9.3× kernel → 2.16× E2E</text>
+    </svg>
+  </div>
+
+  <h3>Three-sentence summary</h3>
+  <div class="card ga">
+    <p>Between any two consecutive denoising steps in a DiT, <strong>only 5–25% of the K/V vectors in attention (and neuron columns in MLP) change significantly</strong> — the rest can be safely reused from cache without perceptible quality loss.</p>
+    <p>Chipmunk identifies this <strong>active set dynamically per step using magnitude-based top-k</strong> (column-sum over attention probabilities; tile-mean delta for MLP), then uses <code>cp.async</code> scatter-gather to pull those scattered vectors from HBM into a packed SRAM tile, giving tensor cores a dense tile to operate on at full utilization despite the underlying sparsity.</p>
+    <p>The overhead of identifying the active set and maintaining the cache is <strong>fused into existing compute via warp specialization</strong>, making bookkeeping effectively free — delivering 9.3× attention kernel speedup and 2.16–3.72× end-to-end on state-of-the-art video DiTs with near-lossless quality.</p>
+  </div>
+
+  <h3>Limitations (honest)</h3>
+  <div class="card">
+    <ul style="color:#cbd5e1;padding-left:18px;">
+      <li><strong>Large models only.</strong> Optimal for compute-bound DiTs (HunyuanVideo 118k seq, FLUX 4.5k). Smaller models: sparsity overhead dominates savings.</li>
+      <li><strong>Few-step models.</strong> If T=4 instead of 50, activations change more aggressively per step → less opportunity for caching.</li>
+      <li><strong>Background quality.</strong> ~90% sparse attention concentrates on subjects → backgrounds can appear slightly soft.</li>
+      <li><strong>Training-free only.</strong> Future work: integrate sparse recomputation into training so models learn to exploit it even more aggressively.</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<div style="text-align:center;padding:32px;color:var(--muted);font-size:0.82rem;border-top:1px solid var(--border);">
+  Based on: Silveria, Govande, Fu. "Chipmunk: Training-Free Acceleration of Diffusion Transformers with Dynamic Column-Sparse Deltas." arXiv:2506.03275, Jun 2025.
+</div>
+
+</body>
+</html>
