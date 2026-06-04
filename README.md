@@ -12,6 +12,9 @@ Full research direction in [`research_proposal.md`](research_proposal.md).
 DualDiffusion under one harness so subsequent kernel work has a defensible ceiling
 to compare against.
 
+- Live results table: [`results/summary/month1_baselines.md`](results/summary/month1_baselines.md)
+- Per-sample logs (W&B): [project link — fill in after `wandb login`](https://wandb.ai/) (set `WANDB_PROJECT=mdm-chipmunk` in your env to stream)
+
 ## Quickstart (CPU, smoke test)
 
 ```bash
@@ -67,6 +70,28 @@ for f in results/llada_*_gsm8k.jsonl; do mdm-bench compare --results $f; done
 
 Targets and tolerances live in `configs/reproduction_targets.yaml`. Host-specific
 overrides (HF cache dir, batch size, num_workers) live in `configs/hosts/*.yaml`.
+
+## Results
+
+Summary table (committed, one row per `method × model × task`):
+[`results/summary/month1_baselines.md`](results/summary/month1_baselines.md).
+
+Per-sample telemetry (latency, NFE, per-step times, peak memory) lives on W&B —
+the harness streams to the project named by `WANDB_PROJECT` whenever that env
+var is set:
+
+```bash
+pip install -e '.[wandb]'
+wandb login
+export WANDB_PROJECT=mdm-chipmunk     # plus WANDB_ENTITY=<your-org> if applicable
+mdm-bench run --method dense --model llada-8b-instruct --task gsm8k \
+    --num-samples 100 --out results/llada_dense_gsm8k.jsonl
+```
+
+Without `WANDB_PROJECT` the harness is a no-op for W&B — JSONL files in
+`results/` remain the ground truth. After a run lands, paste its summary row
+into `results/summary/month1_baselines.md` with the short SHA from
+`git rev-parse --short HEAD` and a link to the W&B run.
 
 ## Layout
 

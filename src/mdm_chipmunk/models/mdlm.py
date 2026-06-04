@@ -30,9 +30,12 @@ class MDLM(MDMModel):
         self.config = config
         self._device = torch.device(device) if device else get_device()
         self._dtype = dtype or get_dtype(self._device)
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            config.hf_id, trust_remote_code=config.trust_remote_code
-        )
+        # The MDLM HF repo ships a custom MDLMConfig but no AutoTokenizer mapping,
+        # so AutoTokenizer.from_pretrained(hf_id, trust_remote_code=True) raises.
+        # MDLM uses GPT-2's BPE plus one extra mask token at id 50257 (see paper §3).
+        self._tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        if self._tokenizer.mask_token is None:
+            self._tokenizer.add_special_tokens({"mask_token": "<mask>"})
         if lazy:
             _LOG.info("MDLM(lazy=True): skipping weight load — tokenizer + config only.")
             self._model = None

@@ -22,8 +22,9 @@ env/
 .DS_Store
 *.swp
 
-# Project artifacts
-results/
+# Project artifacts — keep results/summary/ tracked, ignore everything else under results/
+results/*
+!results/summary/
 checkpoints/
 runs/
 wandb/

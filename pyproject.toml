@@ -12,7 +12,7 @@ authors = [{ name = "Utkarsh Ranjan" }]
 license = { text = "Apache-2.0" }
 dependencies = [
     "torch>=2.3",
-    "transformers>=4.44",
+    "transformers>=4.44,<5",
     "accelerate>=0.33",
     "datasets>=2.20",
     "tokenizers>=0.19",
@@ -26,6 +26,9 @@ dependencies = [
 [project.optional-dependencies]
 gpu = [
     "flash-attn>=2.6; platform_system == 'Linux'",
+]
+wandb = [
+    "wandb>=0.17",
 ]
 dev = [
     "pytest>=8.0",
