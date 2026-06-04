@@ -18,6 +18,32 @@ Update it whenever a phase item moves status.
 
 The 0/7 row is the Month-1 milestone gate (proposal §7).
 
+## Hardware tier — what each tier unlocks
+
+Each row lists the **cheapest** hardware that can validate that capability.
+Higher tiers also work (an H100 runs everything below it).
+
+| Capability | Tier | Cost | Notes |
+|------------|------|------|-------|
+| Phase A scaffolding | **Laptop CPU** | $0 | All editing / config work |
+| `pytest tests/` (synthetic model) | **Laptop CPU** | $0 | Validates harness wiring; currently 26/27 pass |
+| Phase B–C end-to-end smoke on **MDLM-170M** | **RTX 2080 12 GB** (or any CUDA card ≥ 1 GB) | $0 if local | Phase-C checkpoint from the plan |
+| Method ports on MDLM-170M (`dense`, `fastdllm vanilla`, `dkv_cache no_cache`, `dualdiffusion`) | **RTX 2080 12 GB** | $0 if local | Real `forward_logits`, no quantization |
+| LLaDA-8B **interface** sanity (load + 1 forward pass) at 4-bit quant | **RTX 2080 12 GB** | $0 if local | Confirms `models/llada.py` works; **accuracy not paper-comparable** |
+| **Month-1 milestone gate** — LLaDA-8B fp16 × 4 methods × GSM8K (±5 % vs paper) | **A100 80 GB** | ~$60–120 | Single rental, ~30–60 hrs of A100 time |
+| FastDLLM `prefix_cache` / `dual_cache`, dKV-Cache `decode` / `greedy` on real LLaDA | **A100 80 GB** | included above | Needs the upstream modified-LLaDA forks |
+| HumanEval / MMLU repro | **A100 80 GB** | included above | After we add the task files |
+| RULER 8 K–32 K long-context | **H100 80 GB** | extra | Activation memory blows past A100 at 32 K |
+| Cross-arch ablation ("what does Hopper buy us") | **A100 + H100** | both | Proposal §4 explicitly lists this |
+| ThunderKittens kernel dev (Months 2–3) | **H100 SXM5** *required* | ~$2.69 / hr | Needs `sm_90`: TMA, `wgmma`, warp-spec |
+| Headline speedup numbers (the paper's contribution) | **H100 SXM5** *required* | included above | Apples-to-apples vs FastDLLM run on same H100 |
+
+**Practical takeaway:** the 2080 12 GB unlocks everything in Phase A–D against
+MDLM-170M. The A100 rental is the smallest step that lets you check the Month-1
+milestone box. H100 is gated behind the kernel work — don't rent it until
+A100 results say the speedup ceiling justifies the engineering investment
+(proposal §6 risk).
+
 ## Phase-by-phase status
 
 Legend: ✅ done · ⚠️ partial / latent issue · ❌ missing
