@@ -24,7 +24,7 @@ from mdm_chipmunk.utils.device import device_info
 from mdm_chipmunk.utils.logging import get_logger
 
 LOG = get_logger("smoke")
-MODEL = "synthetic"
+MODEL = "mdlm_170m"
 TASK = "synthetic"
 METHOD = "dense"
 NUM_SAMPLES = 3
