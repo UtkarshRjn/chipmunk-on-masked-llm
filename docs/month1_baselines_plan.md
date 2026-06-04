@@ -1,5 +1,7 @@
 # Plan — Start coding the Chipmunk-on-MDM research proposal
 
+> Implementation status against this plan lives in [`progress.md`](progress.md).
+
 ## Context
 
 `research_proposal.md` lays out a 6-month research project: port Chipmunk's sparse attention/MLP kernel toolkit (currently for image/video DiTs) to Masked Diffusion Language Models like LLaDA-8B, add a magnitude-based active-set selection, and stack with FastDLLM / DualDiffusion. The target paper is MLSys/ICLR/NeurIPS with Dan Fu (Chipmunk senior author) as advisor.
