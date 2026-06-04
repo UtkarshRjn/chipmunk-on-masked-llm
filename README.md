@@ -13,7 +13,7 @@ DualDiffusion under one harness so subsequent kernel work has a defensible ceili
 to compare against.
 
 - Live results table: [`results/summary/month1_baselines.md`](results/summary/month1_baselines.md)
-- Per-sample logs (W&B): [project link — fill in after `wandb login`](https://wandb.ai/) (set `WANDB_PROJECT=mdm-chipmunk` in your env to stream)
+- Per-sample logs (W&B): [`utranjan-uc-san-diego/mdm-chipmunk`](https://wandb.ai/utranjan-uc-san-diego/mdm-chipmunk) (set `WANDB_PROJECT=mdm-chipmunk` in your env to stream)
 
 ## Quickstart (CPU, smoke test)
 
