@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from mdm_chipmunk.models import build_model
@@ -10,7 +11,8 @@ def test_synthetic_model_forward_shape():
     ids = torch.randint(0, 32, (2, 16))
     logits = model.forward_logits(ids)
     assert logits.shape == (2, 16, 32)
-    assert torch.isfinite(logits).all()
+    assert not torch.isnan(logits).any()
+    assert torch.isfinite(logits[..., [i for i in range(32) if i != model.mask_token_id]]).all()
 
 
 def test_synthetic_model_attention_mask_respected():
@@ -29,6 +31,7 @@ def test_registry_builds_synthetic_from_yaml():
     assert model.mask_token_id == 1
 
 
+@pytest.mark.network
 def test_registry_lazy_llada(monkeypatch):
     """Lazy load should not hit the network for weights — only tokenizer.
 

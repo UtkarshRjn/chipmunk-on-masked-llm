@@ -44,7 +44,7 @@ def test_dkv_cache_decode_rejects_synthetic_model():
 
 def test_dkv_cache_greedy_requires_random_remasking():
     with pytest.raises(NotImplementedError, match="random"):
-        method = DKVCache(mode="greedy", remasking="low_confidence")
+        method = DKVCache(mode="greedy", remasking="low_confidence", block_length=4)
         model = SyntheticMDM(seq_len=16, vocab_size=32, num_layers=1, d_model=16, n_heads=2)
 
         class _Fake:

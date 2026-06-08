@@ -57,3 +57,6 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::FutureWarning",
 ]
+markers = [
+    "network: mark test as requiring network access (skipped without --network)",
+]

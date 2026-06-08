@@ -113,4 +113,6 @@ class SyntheticMDM(MDMModel):
         else:
             src_key_padding_mask = None
         h = self.backbone(x, src_key_padding_mask=src_key_padding_mask)
-        return self.head(h)
+        logits = self.head(h)
+        logits[..., self.config.mask_token_id] = float("-inf")
+        return logits
