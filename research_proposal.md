@@ -4,7 +4,7 @@
 
 Author: Utkarsh Ranjan
 Target advisor: Dan Y. Fu (UCSD; co-author of Chipmunk)
-Target venues: MLSys / ICLR / NeurIPS
+Target venues: ICLR 2027 workshops (SLLM, DeLTa) as primary near-term target; MLSys / ICLR / NeurIPS main tracks as longer-term aspirational targets
 Status: Draft v2 — corrected against primary sources, May 2026
 
 ---
@@ -516,7 +516,12 @@ Month 5 — Theoretical analysis + spec decoding composition.
 
 Month 6 — Paper writing + final ablations + open-source release.
   Polish ThunderKittens code for release. Final ablations including
-  hardware comparison (A100 vs H100). Submit to MLSys 2027 or ICLR 2027.
+  hardware comparison (A100 vs H100). Primary submission: ICLR 2027
+  workshops (SLLM "Sparsity in LLMs" and/or DeLTa "Deep Generative
+  Models") — deadline ~Feb 2027, ~50–65% acceptance, non-archival, good
+  fit for kernel + sparse-attention story on diffusion LMs. Stretch
+  submission: MLSys 2027 main track if numbers and writing are mature
+  enough by the March 2027 deadline.
 ```
 
 The critical path is Months 2–3 (kernel v1 → v2). If the kernel work falls behind, Months 4–5 compress; theoretical analysis and spec-decoding composition can both run in parallel with engineering.
@@ -557,7 +562,7 @@ The critical path is Months 2–3 (kernel v1 → v2). If the kernel work falls b
 
 3. **Co-authorship with Chipmunk authors?** Silveria/Govande have the kernel craft; involving them turns this into a stronger paper with name recognition. Joint venture between Hazy Research / Sandy Research / MDM-LM communities.
 
-4. **MLSys vs ICLR vs NeurIPS framing?** Heavy kernels lean MLSys; theoretical bound + algorithmic spec composition leans ICLR. The story shapes what gets emphasized in the writing. My read: MLSys 2027 (March deadline) is most natural fit, with ICLR fallback.
+4. **Venue framing — workshop-first vs main-track?** My current plan is to target an **ICLR 2027 workshop** as the primary submission (SLLM "Sparsity in LLMs" or DeLTa "Deep Generative Models"; ~Feb 2027 deadline, ~50–65% acceptance, non-archival). This lets the work get external feedback while results are still maturing, without burning the main-track novelty. MLSys 2027 main track (March 2027 deadline) is a stretch goal if the kernel numbers and theoretical bound land cleanly. Heavy kernels lean MLSys; theoretical bound + algorithmic spec composition leans ICLR — open question whether the story is strong enough by March for the main track, or whether ES-FoMo @ ICML 2027 (May deadline) is a better second-attempt venue.
 
 5. **Distilled drafter as separate contribution?** The drafter design space (Medusa, EAGLE, self-spec, lookahead) is large enough to be its own paper. Could split into two papers if scope balloons — first this kernel + algorithmic paper, then a follow-up on drafter design specifically.
 
