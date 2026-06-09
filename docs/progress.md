@@ -13,7 +13,7 @@ Update it whenever a phase item moves status.
 |-----------|---|
 | Code written (Phases A–D) | ~85 % |
 | Code written (Phase E)    | ~70 % |
-| Validated against a real MDM | ~10 % (only `pytest` on the synthetic model so far) |
+| Validated against a real MDM | ~40 % — all 4 runnable methods now run end-to-end on **MDLM-170M** weights (GTX 1080 Ti, 2026-06-09) |
 | Published numbers reproduced | **0 / 7** rows in `reproduction_targets.yaml` |
 
 The 0/7 row is the Month-1 milestone gate (proposal §7).
@@ -118,18 +118,39 @@ Legend: ✅ done · ⚠️ partial / latent issue · ❌ missing
 | 2 | `test_dkv_cache_greedy_requires_random_remasking` fails (block_length=32 vs gen_length=4) | low | `tests/test_dkv_cache.py:45` |
 | 3 | CPU smoke against MDLM-170M never completed on macOS — Pylance re-indexing the venv made disk reads ~100× slower than usual | env-only | `scripts/smoke_test_cpu.py` |
 | 4 | `configs/hosts/*.yaml` are not loaded by anything | low | `src/mdm_chipmunk/cli.py` |
+| 5 | ✅ FIXED (2026-06-09) — `dualdiffusion.yaml` set `draft_steps: 4`, unsatisfiable for the fastdllm-vanilla drafter (needs steps divisible by `num_blocks` = 256/32 = 8). Bumped to `draft_steps: 8`; now runs via the plain CLI. | medium | `configs/methods/dualdiffusion.yaml` |
+| 6 | ✅ FIXED (2026-06-09) — config/result loaders used `open(path)`/`read_text()` with no `encoding=`; configs contain em-dashes (`—`) → `UnicodeDecodeError` under an ASCII locale. Now pass `encoding="utf-8"` (verified under `LC_ALL=C`). | low | `methods/registry.py`, `models/registry.py`, `eval/tasks/registry.py`, `cli.py` |
+
+## 2026-06-09 — MDLM-170M GPU smoke (GTX 1080 Ti, 11 GB, sm_61)
+
+Ran the four runnable method ports (`dense`, `fastdllm_vanilla`, `dkv_cache_no_cache`,
+`dualdiffusion`) end-to-end on real MDLM-170M weights × GSM8K (5 samples, 16 steps).
+Outputs in `results/mdlm_smoke/*.jsonl`. This validates Phase B+C+D wiring against a
+real `forward_logits` — **not** an accuracy reproduction (170M model, tiny sample).
+
+**Pascal compat shims added** (this card predates flash-attn and bf16):
+- `utils/compat.py::install_flash_attn_fallback()` — pure-PyTorch `flash_attn` stub
+  (non-interleaved RoPE + SDPA for `flash_attn_varlen_qkvpacked_func`, `causal=False`),
+  registered in `sys.modules` so transformers' `check_imports` and the forward pass both pass.
+- `utils/compat.py::patch_autocast_bf16_fallback()` — coerces the model's hardcoded
+  `autocast(dtype=bfloat16)` (modeling_mdlm.py:397) to fp32 on non-bf16 GPUs.
+- Both are wired into `models/mdlm.py` and are no-ops on Ampere+/where flash-attn exists.
+- Env deps installed into `~/.local`: `rich`, `typer`, `einops`.
+
+Numbers are **not** perf-meaningful (fallback attention, slow Pascal): dense/dkv ~220–255
+tok/s, fastdllm/dualdiffusion ~30–40 tok/s.
 
 ## Validated vs. not validated
 
 | Component | On `synthetic` | On `mdlm-170m` | On `llada-8b` |
 |-----------|----------------|----------------|---------------|
-| `dense` | ✅ pytest | ❌ | ❌ |
-| `fastdllm vanilla` | ✅ pytest | ❌ | ❌ |
+| `dense` | ✅ pytest | ✅ GPU smoke | ❌ |
+| `fastdllm vanilla` | ✅ pytest | ✅ GPU smoke | ❌ |
 | `fastdllm prefix_cache / dual_cache` | n/a (guard rejects) | ❌ | ❌ |
-| `dkv_cache no_cache` | ✅ pytest | ❌ | ❌ |
+| `dkv_cache no_cache` | ✅ pytest | ✅ GPU smoke | ❌ |
 | `dkv_cache decode / greedy` | n/a (guard rejects) | ❌ | ❌ |
-| `dualdiffusion` | ✅ pytest | ❌ | ❌ |
-| Harness end-to-end (writes JSONL) | ✅ (`results/smoke.jsonl`) | ❌ | ❌ |
+| `dualdiffusion` | ✅ pytest | ✅ GPU smoke (config `draft_steps` fixed to 8) | ❌ |
+| Harness end-to-end (writes JSONL) | ✅ (`results/smoke.jsonl`) | ✅ (`results/mdlm_smoke/*.jsonl`) | ❌ |
 | W&B streaming | ❌ (env var never set in any run) | ❌ | ❌ |
 | `mdm-bench compare` vs `reproduction_targets.yaml` | n/a | n/a | ❌ |
 

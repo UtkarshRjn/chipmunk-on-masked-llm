@@ -72,11 +72,11 @@ def compare_cmd(
     """Check whether reproduced numbers match published targets within tolerance."""
     if not results.exists():
         raise typer.BadParameter(f"Results file not found: {results}")
-    with open(targets) as f:
+    with open(targets, encoding="utf-8") as f:
         tgt_cfg = yaml.safe_load(f)
     tolerance = float(tgt_cfg.get("tolerance", 0.05))
 
-    rows = [json.loads(line) for line in results.read_text().splitlines() if line.strip()]
+    rows = [json.loads(line) for line in results.read_text(encoding="utf-8").splitlines() if line.strip()]
     if not rows:
         console.print("[yellow]No rows in results file.[/yellow]")
         return

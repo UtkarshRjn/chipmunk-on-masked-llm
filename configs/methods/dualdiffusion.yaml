@@ -5,7 +5,7 @@ drafter_method_cfg:
   mode: vanilla
   block_length: 32
   threshold: 0.5
-draft_steps: 4
+draft_steps: 8        # must be a multiple of num_blocks (gen_length / block_length); for gsm8k 256/32 = 8
 verify_rule: confidence    # confidence | kl | both
 confidence_threshold: 0.7
 kl_threshold: 0.5

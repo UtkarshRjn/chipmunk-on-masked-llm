@@ -16,7 +16,7 @@ def _load_yaml(name: str) -> dict[str, Any]:
     path = _CONFIG_DIR / f"{name}.yaml"
     if not path.exists():
         raise FileNotFoundError(f"No model config at {path}. Available: {list_models()}")
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
