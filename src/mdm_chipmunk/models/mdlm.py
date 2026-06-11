@@ -4,7 +4,12 @@ from typing import Any
 
 import torch
 
-from ..utils.compat import hf_load_kwargs, patch_flash_attn_wrap_triton
+from ..utils.compat import (
+    hf_load_kwargs,
+    install_flash_attn_fallback,
+    patch_autocast_bf16_fallback,
+    patch_flash_attn_wrap_triton,
+)
 from ..utils.device import get_device, get_dtype
 from ..utils.logging import get_logger
 from .base import MDMModel, ModelConfig
@@ -42,6 +47,12 @@ class MDLM(MDMModel):
         self._tokenizer = AutoTokenizer.from_pretrained("gpt2")
         if self._tokenizer.mask_token is None:
             self._tokenizer.add_special_tokens({"mask_token": "<mask>"})
+        if install_flash_attn_fallback():
+            _LOG.warning(
+                "flash_attn not importable (expected on pre-Ampere GPUs); using "
+                "pure-PyTorch fallback. Correct but slower; not for perf numbers."
+            )
+        patch_autocast_bf16_fallback()
         patch_flash_attn_wrap_triton()
 
         if lazy:
